@@ -1,353 +1,353 @@
-# Harmonya - Site Web de Massage & Bien-être
+# Harmonya - Massage & Wellness Website
 
-Application web Flutter pour Harmonya, un salon de massage dédié aux femmes situé à Illkirch-Graffenstaden, France.
+Flutter web application for Harmonya, a massage salon dedicated to women located in Illkirch-Graffenstaden, France.
 
-🌐 **Site web en ligne** : [https://harmonyamassage.fr](https://harmonyamassage.fr)
+🌐 **Live website**: [https://harmonyamassage.fr](https://harmonyamassage.fr)
 
 ## 🌟 Description
 
-Harmonya est une application web moderne permettant aux visiteurs de :
-- Découvrir les différents types de massages proposés
-- Réserver une séance de massage en ligne (sur place ou à domicile)
-- Laisser des avis et consulter les témoignages d'autres clientes
-- Acheter des bons cadeaux pour offrir à leurs proches
-- Accéder aux informations de contact
+Harmonya is a modern web application that allows visitors to:
+- Discover the different types of massages offered
+- Book a massage session online (on-site or at home)
+- Leave reviews and read testimonials from other clients
+- Purchase gift vouchers for their loved ones
+- Access contact information
 
-Les administrateurs peuvent gérer les réservations, modérer les avis, gérer les clients et les bons cadeaux via un panneau d'administration sécurisé.
+Administrators can manage bookings, moderate reviews, manage customers and gift vouchers through a secure admin panel.
 
-## ✨ Fonctionnalités
+## ✨ Features
 
-### Pour les visiteurs
-- **Page d'accueil** avec présentation des services et de la praticienne
-- **Réservation en ligne** avec :
-  - Sélection de date (pas de réservation le dimanche)
-  - Sélection d'heure via un tableau horaire (Lun-Ven: 17h-22h, Sam: 10h-20h)
-  - Choix du type de massage
-  - Option "Massage à domicile" avec frais de transport
-  - Vérification automatique des créneaux déjà réservés
-- **Système d'avis** permettant de laisser un témoignage avec prénom et nom
-- **Affichage des avis approuvés** pour consulter les retours d'autres clientes
-- **Achat de bons cadeaux** avec paiement PayPal
-- **Informations de contact** (adresse cliquable pour Google Maps, téléphone cliquable)
+### For Visitors
+- **Homepage** with presentation of services and the practitioner
+- **Online booking** with:
+  - Date selection (no bookings on Sundays)
+  - Time selection via timetable (Mon-Fri: 5pm-10pm, Sat: 10am-8pm)
+  - Massage type selection
+  - "Home massage" option with transportation fees
+  - Automatic checking of already booked time slots
+- **Review system** allowing visitors to leave testimonials with first name and last name
+- **Display of approved reviews** to read feedback from other clients
+- **Gift voucher purchase** with PayPal payment
+- **Contact information** (clickable address for Google Maps, clickable phone number)
 
-### Pour les administrateurs
-- **Authentification sécurisée** via Firebase Auth avec réinitialisation de mot de passe
-- **Gestion des réservations** :
-  - Visualisation de toutes les réservations en liste
-  - Vue calendrier pour une meilleure organisation
-  - Création manuelle de réservations (statut "confirmé" automatique)
-  - Modification du statut (en attente, confirmée, annulée)
-  - Suppression de réservations
-  - Badge indiquant le nombre de réservations en attente
-- **Modération des avis** :
-  - Consultation des avis en attente d'approbation
-  - Approbation ou refus d'avis avec confirmation par dialog
-  - Badge indiquant le nombre d'avis en attente
-- **Gestion des clients** :
-  - Liste de tous les clients
-  - Création, modification et suppression de clients
-  - Historique des types de massages par client
-- **Gestion des bons cadeaux** :
-  - Liste de tous les bons cadeaux
-  - Suivi du statut (pending, paid, used, expired)
-  - Informations sur l'acheteur et le destinataire
-- **Navigation** vers la page d'accueil tout en restant connecté
+### For Administrators
+- **Secure authentication** via Firebase Auth with password reset
+- **Booking management**:
+  - View all bookings in list format
+  - Calendar view for better organization
+  - Manual booking creation (automatically set to "confirmed" status)
+  - Status modification (pending, confirmed, cancelled)
+  - Booking deletion
+  - Badge showing number of pending bookings
+- **Review moderation**:
+  - View reviews pending approval
+  - Approve or reject reviews with confirmation dialog
+  - Badge showing number of pending reviews
+- **Customer management**:
+  - List of all customers
+  - Create, edit and delete customers
+  - History of massage types per customer
+- **Gift voucher management**:
+  - List of all gift vouchers
+  - Status tracking (pending, paid, used, expired)
+  - Information about purchaser and recipient
+- **Navigation** to homepage while remaining logged in
 
-## 🛠️ Technologies utilisées
+## 🛠️ Technologies Used
 
 ### Frontend
-- **Flutter Web** - Framework de développement multiplateforme
-- **Firebase SDK** :
-  - **Firestore** - Base de données pour les réservations, avis, clients et bons cadeaux
-  - **Firebase Auth** - Authentification des administrateurs
-- **table_calendar** - Affichage du calendrier dans le panneau admin
-- **intl** - Formatage des dates en français
-- **url_launcher** - Ouverture de Google Maps et de l'application téléphone
-- **flutter_dotenv** - Gestion des variables d'environnement
-- **PayPal Checkout SDK** - Intégration PayPal pour les paiements
+- **Flutter Web** - Cross-platform development framework
+- **Firebase SDK**:
+  - **Firestore** - Database for bookings, reviews, customers and gift vouchers
+  - **Firebase Auth** - Administrator authentication
+- **table_calendar** - Calendar display in admin panel
+- **intl** - French date formatting
+- **url_launcher** - Opening Google Maps and phone app
+- **flutter_dotenv** - Environment variable management
+- **PayPal Checkout SDK** - PayPal integration for payments
 
 ### Backend
-- **Firebase Cloud Functions (Python)** - Fonctions serverless pour :
-  - Envoi d'emails automatiques (réservations, avis, bons cadeaux)
-  - Gestion des clients lors de la confirmation de réservation
-  - Webhook PayPal pour la confirmation des paiements
-- **Resend API** - Service d'envoi d'emails transactionnels
+- **Firebase Cloud Functions (Python)** - Serverless functions for:
+  - Automatic email sending (bookings, reviews, gift vouchers)
+  - Customer management when booking is confirmed
+  - PayPal webhook for payment confirmation
+- **Resend API** - Transactional email service
 
-## 📋 Prérequis
+## 📋 Prerequisites
 
-- Flutter SDK 3.10.1 ou supérieur
+- Flutter SDK 3.10.1 or higher
 - Dart SDK
-- Node.js (pour Firebase CLI)
-- Python 3.12 (pour les Cloud Functions)
-- Compte Firebase avec projet configuré
-- Compte PayPal Developer (pour les paiements)
-- Compte Resend (pour les emails)
+- Node.js (for Firebase CLI)
+- Python 3.12 (for Cloud Functions)
+- Firebase account with configured project
+- PayPal Developer account (for payments)
+- Resend account (for emails)
 
 ## 🚀 Installation
 
-### 1. Cloner le projet
+### 1. Clone the project
 ```bash
 git clone <repository-url>
 cd harmonya
 ```
 
-### 2. Installer les dépendances Flutter
+### 2. Install Flutter dependencies
 ```bash
 flutter pub get
 ```
 
-### 3. Configurer les variables d'environnement
+### 3. Configure environment variables
 
-Créez un fichier `.env` à la racine du projet (voir `.env.example`) :
+Create a `.env` file at the project root (see `.env.example`):
 
 ```bash
 cp .env.example .env
 ```
 
-Remplissez les valeurs dans `.env` :
-- **Firebase** : API Key, Auth Domain, Project ID, etc.
-- **PayPal** : Client ID (Sandbox ou Production), Environment
+Fill in the values in `.env`:
+- **Firebase**: API Key, Auth Domain, Project ID, etc.
+- **PayPal**: Client ID (Sandbox or Production), Environment
 
-> ⚠️ **Important** : Le fichier `.env` est déjà dans `.gitignore` et ne sera pas commité. Ne partagez jamais ce fichier !
+> ⚠️ **Important**: The `.env` file is already in `.gitignore` and will not be committed. Never share this file!
 
-### 4. Configurer Firebase
+### 4. Configure Firebase
 
-#### 4.1. Initialiser Firebase
+#### 4.1. Initialize Firebase
 ```bash
 firebase login
 firebase use --add
-# Sélectionnez votre projet Firebase
+# Select your Firebase project
 ```
 
-#### 4.2. Configurer les Cloud Functions
+#### 4.2. Configure Cloud Functions
 
 ```bash
 cd functions
 python3.12 -m venv venv
-source venv/bin/activate  # Sur Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### 4.3. Configurer les variables d'environnement Firebase
+#### 4.3. Configure Firebase environment variables
 
 ```bash
-firebase functions:config:set resend.api_key="votre_resend_api_key"
-firebase functions:config:set admin.email="votre_email_admin"
+firebase functions:config:set resend.api_key="your_resend_api_key"
+firebase functions:config:set admin.email="your_admin_email"
 firebase functions:config:set from.email="Harmonya <contact@harmonyamassage.fr>"
 ```
 
-### 5. Lancer l'application en développement
+### 5. Run the application in development
 
 ```bash
 flutter run -d chrome
 ```
 
-## 📦 Structure du projet
+## 📦 Project Structure
 
 ```
 harmonya/
 ├── lib/
 │   ├── config/
-│   │   ├── firebase_config.dart      # Configuration Firebase
-│   │   └── paypal_config.dart        # Configuration PayPal
+│   │   ├── firebase_config.dart      # Firebase configuration
+│   │   └── paypal_config.dart        # PayPal configuration
 │   ├── models/
-│   │   ├── booking.dart              # Modèle de données pour les réservations
-│   │   ├── review.dart               # Modèle de données pour les avis
-│   │   ├── customer.dart             # Modèle de données pour les clients
-│   │   └── gift_voucher.dart        # Modèle de données pour les bons cadeaux
+│   │   ├── booking.dart              # Booking data model
+│   │   ├── review.dart               # Review data model
+│   │   ├── customer.dart             # Customer data model
+│   │   └── gift_voucher.dart        # Gift voucher data model
 │   ├── pages/
-│   │   ├── landing_page.dart         # Page d'accueil principale
-│   │   ├── admin_login_page.dart     # Page de connexion admin
-│   │   ├── admin_panel_page.dart     # Panneau d'administration
-│   │   └── paypal_payment_page.dart  # Page de paiement PayPal
+│   │   ├── landing_page.dart         # Main homepage
+│   │   ├── admin_login_page.dart     # Admin login page
+│   │   ├── admin_panel_page.dart     # Admin panel
+│   │   └── paypal_payment_page.dart  # PayPal payment page
 │   ├── services/
-│   │   ├── firebase_service.dart     # Opérations Firestore
-│   │   └── auth_service.dart         # Gestion de l'authentification
+│   │   ├── firebase_service.dart     # Firestore operations
+│   │   └── auth_service.dart         # Authentication management
 │   ├── theme/
-│   │   └── app_theme.dart            # Thème avec palette brown/beige
+│   │   └── app_theme.dart            # Theme with brown/beige palette
 │   └── widgets/
-│       ├── booking_form.dart         # Formulaire de réservation
-│       ├── review_form.dart          # Formulaire d'avis
-│       ├── review_section.dart       # Affichage des avis approuvés
-│       ├── massage_card.dart         # Carte de présentation d'un massage
-│       ├── gift_voucher_form.dart    # Formulaire d'achat de bon cadeau
-│       ├── paypal_button_widget.dart # Widget PayPal
-│       ├── admin_booking_list.dart   # Liste des réservations (admin)
-│       ├── admin_booking_calendar.dart # Calendrier des réservations (admin)
-│       ├── admin_review_list.dart    # Liste des avis en attente (admin)
-│       ├── admin_voucher_list.dart   # Liste des bons cadeaux (admin)
-│       └── customers.dart            # Gestion des clients (admin)
+│       ├── booking_form.dart         # Booking form
+│       ├── review_form.dart          # Review form
+│       ├── review_section.dart       # Approved reviews display
+│       ├── massage_card.dart         # Massage presentation card
+│       ├── gift_voucher_form.dart    # Gift voucher purchase form
+│       ├── paypal_button_widget.dart # PayPal widget
+│       ├── admin_booking_list.dart   # Booking list (admin)
+│       ├── admin_booking_calendar.dart # Booking calendar (admin)
+│       ├── admin_review_list.dart    # Pending reviews list (admin)
+│       ├── admin_voucher_list.dart   # Gift vouchers list (admin)
+│       └── customers.dart            # Customer management (admin)
 ├── functions/
-│   ├── main.py                       # Cloud Functions Python
-│   ├── requirements.txt              # Dépendances Python
-│   └── venv/                         # Environnement virtuel Python
+│   ├── main.py                       # Python Cloud Functions
+│   ├── requirements.txt             # Python dependencies
+│   └── venv/                         # Python virtual environment
 ├── web/
-│   └── index.html                    # Point d'entrée HTML avec meta tags
-├── .env.example                      # Template pour les variables d'environnement
-├── build_sandbox.sh                  # Script de build pour Sandbox
-├── build_production.sh               # Script de build pour Production
-└── firebase.json                     # Configuration Firebase
+│   └── index.html                    # HTML entry point with meta tags
+├── .env.example                      # Environment variables template
+├── build_sandbox.sh                  # Sandbox build script
+├── build_production.sh               # Production build script
+└── firebase.json                     # Firebase configuration
 ```
 
-## 🎨 Types de massages
+## 🎨 Massage Types
 
-1. **Découverte** - 45€ / 30 min
-   - Zones : cervicales, dos, épaule, jambes
+1. **Découverte** - €45 / 30 min
+   - Areas: neck, back, shoulders, legs
 
-2. **Immersion** - 60€ / 60 min
-   - Thèmes : Les Îles, L'Asie, L'Orient, L'Afrique
+2. **Immersion** - €60 / 60 min
+   - Themes: The Islands, Asia, The Orient, Africa
 
-3. **Evasion** - 85€ / 90 min
-   - Techniques de réflexologie combinées
+3. **Evasion** - €85 / 90 min
+   - Combined reflexology techniques
 
-4. **Cocooning** - 95€ (60 min) ou 115€ (90 min)
-   - Massage aux pierres chaudes
-   - Zones : cervicales, dos, épaules, visage, jambes, pieds
+4. **Cocooning** - €95 (60 min) or €115 (90 min)
+   - Hot stone massage
+   - Areas: neck, back, shoulders, face, legs, feet
 
-### Massage à domicile
-- **Frais de transport** : 5€ (Illkirch-Graffenstaden) ou 10€ (autres zones)
+### Home Massage
+- **Transportation fees**: €5 (Illkirch-Graffenstaden) or €10 (other areas)
 
-## 📧 Emails automatiques
+## 📧 Automatic Emails
 
-Le système envoie automatiquement des emails via Resend :
+The system automatically sends emails via Resend:
 
-- **Nouvelle réservation** : Email à l'admin
-- **Réservation confirmée/annulée** : Email au client
-- **Nouvel avis** : Email à l'admin
-- **Bon cadeau payé** : Emails à l'acheteur, au destinataire et à l'admin
+- **New booking**: Email to admin
+- **Booking confirmed/cancelled**: Email to client
+- **New review**: Email to admin
+- **Gift voucher paid**: Emails to purchaser, recipient and admin
 
-Voir `EMAIL_SETUP.md` pour la configuration détaillée.
+See `EMAIL_SETUP.md` for detailed configuration.
 
-## 💳 Intégration PayPal
+## 💳 PayPal Integration
 
-Le système supporte les paiements PayPal pour les bons cadeaux :
+The system supports PayPal payments for gift vouchers:
 
-- **Sandbox** : Pour les tests (voir `PAYPAL_TESTING.md`)
-- **Production** : Pour les paiements réels
+- **Sandbox**: For testing (see `PAYPAL_TESTING.md`)
+- **Production**: For real payments
 
-Voir `WEBHOOK_SETUP.md` pour configurer les webhooks PayPal.
+See `WEBHOOK_SETUP.md` to configure PayPal webhooks.
 
-## 🏗️ Build et Déploiement
+## 🏗️ Build and Deployment
 
-### Build pour Sandbox (test)
+### Build for Sandbox (testing)
 ```bash
 ./build_sandbox.sh
 ```
 
-### Build pour Production
+### Build for Production
 ```bash
 ./build_production.sh
 ```
 
-Voir `SANDBOX_BUILD.md` et `PRODUCTION_BUILD.md` pour plus de détails.
+See `SANDBOX_BUILD.md` and `PRODUCTION_BUILD.md` for more details.
 
-### Déploiement Firebase
+### Firebase Deployment
 
 ```bash
-# Déployer uniquement le hosting
+# Deploy hosting only
 firebase deploy --only hosting
 
-# Déployer uniquement les fonctions
+# Deploy functions only
 firebase deploy --only functions
 
-# Déployer tout
+# Deploy everything
 firebase deploy
 ```
 
-## 🔒 Sécurité
+## 🔒 Security
 
-- ✅ Toutes les clés sensibles sont dans `.env` (non commité)
-- ✅ Firebase API keys sont publiques mais protégées par les règles de sécurité
-- ✅ Authentification admin sécurisée via Firebase Auth
-- ✅ Validation côté serveur pour les emails et webhooks
+- ✅ All sensitive keys are in `.env` (not committed)
+- ✅ Firebase API keys are public but protected by security rules
+- ✅ Secure admin authentication via Firebase Auth
+- ✅ Server-side validation for emails and webhooks
 
-Voir `SECURITY_CHECKLIST.md` avant de rendre le repository public.
+See `FILES_TO_PROTECT.md` before making the repository public.
 
-## 📚 Documentation supplémentaire
+## 📚 Additional Documentation
 
-- `ENV_SETUP.md` - Configuration des variables d'environnement
-- `EMAIL_SETUP.md` - Configuration de Resend pour les emails
-- `PAYPAL_TESTING.md` - Guide de test PayPal Sandbox
-- `WEBHOOK_SETUP.md` - Configuration des webhooks PayPal
-- `SANDBOX_BUILD.md` - Instructions de build Sandbox
-- `PRODUCTION_BUILD.md` - Instructions de build Production
-- `GITHUB_SETUP.md` - Configuration GitHub
-- `SECURITY_CHECKLIST.md` - Checklist de sécurité
+- `ENV_SETUP.md` - Environment variable configuration
+- `EMAIL_SETUP.md` - Resend email configuration
+- `PAYPAL_TESTING.md` - PayPal Sandbox testing guide
+- `WEBHOOK_SETUP.md` - PayPal webhook configuration
+- `SANDBOX_BUILD.md` - Sandbox build instructions
+- `PRODUCTION_BUILD.md` - Production build instructions
+- `GITHUB_SETUP.md` - GitHub configuration
+- `FILES_TO_PROTECT.md` - Security checklist
 
-## 📞 Informations de contact
+## 📞 Contact Information
 
-- **Adresse** : 1 A rue de la poste, 67400 ILLKIRCH GRAFFENSTADEN
-- **Téléphone** : 06 26 14 25 89
-- **Site web** : https://harmonyamassage.fr
-- **Service** : Réservé aux femmes
+- **Address**: 1 A rue de la poste, 67400 ILLKIRCH GRAFFENSTADEN
+- **Phone**: 06 26 14 25 89
+- **Website**: https://harmonyamassage.fr
+- **Service**: Reserved for women
 
-## 🎨 Palette de couleurs
+## 🎨 Color Palette
 
-- **Brown** : `#6B4423` (primary)
-- **Beige** : `#F5F1E8` (surface), `#E8DDD0` (medium), `#D4C4B0` (dark)
+- **Brown**: `#6B4423` (primary)
+- **Beige**: `#F5F1E8` (surface), `#E8DDD0` (medium), `#D4C4B0` (dark)
 
-## 🧪 Développement
+## 🧪 Development
 
-### Commandes utiles
+### Useful Commands
 
 ```bash
-# Lancer en mode développement
+# Run in development mode
 flutter run -d chrome
 
-# Construire pour la production
+# Build for production
 flutter build web
 
-# Analyser le code
+# Analyze code
 flutter analyze
 
-# Formater le code
+# Format code
 dart format lib/
 
-# Tester les fonctions localement
+# Test functions locally
 cd functions
 firebase functions:shell
 ```
 
-### Créer un compte administrateur
+### Create an Administrator Account
 
-1. Aller dans Firebase Console > Authentication > Users
-2. Ajouter un nouvel utilisateur avec email et mot de passe
-3. Utiliser ces identifiants pour se connecter au panneau admin
+1. Go to Firebase Console > Authentication > Users
+2. Add a new user with email and password
+3. Use these credentials to log in to the admin panel
 
-### Index Firestore requis
+### Required Firestore Indexes
 
-Les index suivants sont créés automatiquement ou peuvent être créés manuellement :
+The following indexes are created automatically or can be created manually:
 
-- Collection `reviews` : index composite sur `approved` + `createdAt`
-- Collection `bookings` : index sur `date` + `time` (pour éviter les doublons)
-- Collection `bookings` : index sur `createdAt` (pour le tri)
+- Collection `reviews`: composite index on `approved` + `createdAt`
+- Collection `bookings`: index on `date` + `time` (to avoid duplicates)
+- Collection `bookings`: index on `createdAt` (for sorting)
 
-## 📝 Notes importantes
+## 📝 Important Notes
 
-- Les avis sont anonymisés pour la confidentialité (affichage : "Prénom L." au lieu du nom complet)
-- Les réservations nécessitent une validation manuelle par l'administrateur (sauf si créées par l'admin)
-- Le calendrier admin nécessite des index Firestore pour fonctionner correctement
-- L'application est optimisée pour le web et utilise un design responsive
-- Les bons cadeaux expirent après 1 an
-- Les emails sont envoyés automatiquement via Firebase Cloud Functions
+- Reviews are anonymized for privacy (display: "First Name L." instead of full name)
+- Bookings require manual validation by administrator (except if created by admin)
+- Admin calendar requires Firestore indexes to work correctly
+- Application is optimized for web and uses responsive design
+- Gift vouchers expire after 1 year
+- Emails are sent automatically via Firebase Cloud Functions
 
-## 🐛 Dépannage
+## 🐛 Troubleshooting
 
-### PayPal SDK ne se charge pas
-- Vérifiez que `PAYPAL_CLIENT_ID` est correctement configuré dans `.env`
-- Vérifiez la console du navigateur pour les erreurs
+### PayPal SDK not loading
+- Verify that `PAYPAL_CLIENT_ID` is correctly configured in `.env`
+- Check browser console for errors
 
-### Les emails ne sont pas envoyés
-- Vérifiez que `RESEND_API_KEY` est configuré dans Firebase Functions
-- Vérifiez les logs Firebase Functions pour les erreurs
+### Emails not being sent
+- Verify that `RESEND_API_KEY` is configured in Firebase Functions
+- Check Firebase Functions logs for errors
 
-### Les dates ne s'affichent pas correctement
-- Vérifiez que `initializeDateFormatting('fr_FR')` est appelé dans `main.dart`
+### Dates not displaying correctly
+- Verify that `initializeDateFormatting('fr_FR')` is called in `main.dart`
 
-## 📄 Licence
+## 📄 License
 
-Ce projet est privé et réservé à l'usage de Harmonya.
+This project is private and reserved for Harmonya's use.
 
 ## 👥 Contribution
 
-Ce projet est privé. Pour toute question ou problème, contactez l'équipe de développement.
+This project is private. For any questions or issues, contact the development team.
