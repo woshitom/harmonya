@@ -10,15 +10,18 @@ This guide shows you how to build and deploy your Harmonya website for testing w
 ```
 
 **Option 2: Manual command**
+
+> ⚠️ **Note**: It's recommended to use the build script or `.env` file instead of hardcoding values.
+
 ```bash
 flutter build web \
-  --dart-define=FIREBASE_API_KEY=AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc \
-  --dart-define=FIREBASE_AUTH_DOMAIN=harmonya-fr.firebaseapp.com \
-  --dart-define=FIREBASE_PROJECT_ID=harmonya-fr \
-  --dart-define=FIREBASE_STORAGE_BUCKET=harmonya-fr.firebasestorage.app \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=798066243552 \
-  --dart-define=FIREBASE_APP_ID=1:798066243552:web:c40e11753dab02369f1d85 \
-  --dart-define=FIREBASE_MEASUREMENT_ID=G-4L6HBV1M02 \
+  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY \
+  --dart-define=FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com \
+  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID \
+  --dart-define=FIREBASE_APP_ID=YOUR_APP_ID \
+  --dart-define=FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID \
   --dart-define=PAYPAL_CLIENT_ID=YOUR_SANDBOX_CLIENT_ID \
   --dart-define=PAYPAL_ENVIRONMENT=sandbox
 
@@ -48,13 +51,13 @@ flutter pub get
 
 # 4. Build for sandbox/testing
 flutter build web \
-  --dart-define=FIREBASE_API_KEY=AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc \
-  --dart-define=FIREBASE_AUTH_DOMAIN=harmonya-fr.firebaseapp.com \
-  --dart-define=FIREBASE_PROJECT_ID=harmonya-fr \
-  --dart-define=FIREBASE_STORAGE_BUCKET=harmonya-fr.firebasestorage.app \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=798066243552 \
-  --dart-define=FIREBASE_APP_ID=1:798066243552:web:c40e11753dab02369f1d85 \
-  --dart-define=FIREBASE_MEASUREMENT_ID=G-4L6HBV1M02 \
+  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY \
+  --dart-define=FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com \
+  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID \
+  --dart-define=FIREBASE_APP_ID=YOUR_APP_ID \
+  --dart-define=FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID \
   --dart-define=PAYPAL_CLIENT_ID=YOUR_SANDBOX_CLIENT_ID \
   --dart-define=PAYPAL_ENVIRONMENT=sandbox
 

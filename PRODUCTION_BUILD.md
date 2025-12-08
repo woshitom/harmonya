@@ -14,12 +14,12 @@ Run this command with your actual production values:
 
 ```bash
 flutter build web \
-  --dart-define=FIREBASE_API_KEY=AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc \
-  --dart-define=FIREBASE_AUTH_DOMAIN=harmonya-fr.firebaseapp.com \
-  --dart-define=FIREBASE_PROJECT_ID=harmonya-fr \
-  --dart-define=FIREBASE_STORAGE_BUCKET=harmonya-fr.firebasestorage.app \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=798066243552 \
-  --dart-define=FIREBASE_APP_ID=1:798066243552:web:c40e11753dab02369f1d85 \
+  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY \
+  --dart-define=FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com \
+  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID \
+  --dart-define=FIREBASE_APP_ID=YOUR_APP_ID \
   --dart-define=FIREBASE_MEASUREMENT_ID=G-4L6HBV1M02 \
   --dart-define=PAYPAL_CLIENT_ID=YOUR_PRODUCTION_PAYPAL_CLIENT_ID \
   --dart-define=PAYPAL_ENVIRONMENT=production
@@ -50,12 +50,12 @@ set -e  # Exit on error
 echo "Building for production..."
 
 flutter build web \
-  --dart-define=FIREBASE_API_KEY=AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc \
-  --dart-define=FIREBASE_AUTH_DOMAIN=harmonya-fr.firebaseapp.com \
-  --dart-define=FIREBASE_PROJECT_ID=harmonya-fr \
-  --dart-define=FIREBASE_STORAGE_BUCKET=harmonya-fr.firebasestorage.app \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=798066243552 \
-  --dart-define=FIREBASE_APP_ID=1:798066243552:web:c40e11753dab02369f1d85 \
+  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY \
+  --dart-define=FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com \
+  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID \
+  --dart-define=FIREBASE_APP_ID=YOUR_APP_ID \
   --dart-define=FIREBASE_MEASUREMENT_ID=G-4L6HBV1M02 \
   --dart-define=PAYPAL_CLIENT_ID=YOUR_PRODUCTION_PAYPAL_CLIENT_ID \
   --dart-define=PAYPAL_ENVIRONMENT=production
@@ -90,12 +90,12 @@ flutter pub get
 
 # 4. Build for production
 flutter build web \
-  --dart-define=FIREBASE_API_KEY=AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc \
-  --dart-define=FIREBASE_AUTH_DOMAIN=harmonya-fr.firebaseapp.com \
-  --dart-define=FIREBASE_PROJECT_ID=harmonya-fr \
-  --dart-define=FIREBASE_STORAGE_BUCKET=harmonya-fr.firebasestorage.app \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=798066243552 \
-  --dart-define=FIREBASE_APP_ID=1:798066243552:web:c40e11753dab02369f1d85 \
+  --dart-define=FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY \
+  --dart-define=FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com \
+  --dart-define=FIREBASE_PROJECT_ID=YOUR_PROJECT_ID \
+  --dart-define=FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID \
+  --dart-define=FIREBASE_APP_ID=YOUR_APP_ID \
   --dart-define=FIREBASE_MEASUREMENT_ID=G-4L6HBV1M02 \
   --dart-define=PAYPAL_CLIENT_ID=YOUR_LIVE_PAYPAL_CLIENT_ID_HERE \
   --dart-define=PAYPAL_ENVIRONMENT=production
@@ -145,7 +145,7 @@ firebase deploy --only hosting
 
 ### Firebase not initializing
 - Verify all Firebase config values are correct
-- Check Firebase project is active: `firebase use harmonya-fr`
+- Check Firebase project is active: `firebase use YOUR_PROJECT_ID`
 - Verify Firebase Hosting is configured in `firebase.json`
 
 ## Quick Reference
