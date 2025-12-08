@@ -23,6 +23,8 @@ import json
 initialize_app()
 
 # Configuration
+# IMPORTANT: Never hardcode API keys or secrets in source code!
+# Use environment variables or Firebase Functions config instead.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "contact@harmonyamassage.fr")
 # Note: Resend doesn't allow free domains like gmail.com
@@ -34,28 +36,58 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 
+def parse_firestore_date(date_value) -> datetime | None:
+    """Parse une date Firestore dans différents formats"""
+    if date_value is None:
+        return None
+    
+    # Format dict Firestore Timestamp (le plus commun)
+    if isinstance(date_value, dict):
+        seconds = date_value.get("_seconds") or date_value.get("seconds")
+        if seconds:
+            nanoseconds = date_value.get("_nanoseconds") or date_value.get("nanoseconds", 0)
+            return datetime.fromtimestamp(seconds + nanoseconds / 1e9)
+        # Essayer aussi avec d'autres clés possibles
+        if "value" in date_value:
+            return parse_firestore_date(date_value["value"])
+    
+    # Objet Timestamp Firestore (avec méthode to_datetime)
+    if hasattr(date_value, 'to_datetime'):
+        try:
+            return date_value.to_datetime()
+        except:
+            pass
+    
+    # Objet Timestamp Firestore (avec méthode timestamp)
+    if hasattr(date_value, 'timestamp'):
+        try:
+            return datetime.fromtimestamp(date_value.timestamp())
+        except:
+            pass
+    
+    # String ISO format
+    if isinstance(date_value, str):
+        try:
+            return datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+        except:
+            try:
+                return datetime.strptime(date_value, '%Y-%m-%dT%H:%M:%S.%f')
+            except:
+                try:
+                    return datetime.strptime(date_value, '%Y-%m-%d %H:%M:%S')
+                except:
+                    pass
+    
+    # Déjà un datetime
+    if isinstance(date_value, datetime):
+        return date_value
+    
+    return None
+
+
 def format_date_french(timestamp) -> str:
     """Formate une date en français"""
-    date = None
-    
-    # Gérer différents formats de timestamp Firestore
-    if isinstance(timestamp, dict):
-        # Firestore Timestamp format (dict avec _seconds ou seconds)
-        seconds = timestamp.get("_seconds") or timestamp.get("seconds", 0)
-        nanoseconds = timestamp.get("_nanoseconds") or timestamp.get("nanoseconds", 0)
-        if seconds:
-            date = datetime.fromtimestamp(seconds + nanoseconds / 1e9)
-    elif hasattr(timestamp, 'timestamp'):
-        # Objet Timestamp Firestore
-        try:
-            date = timestamp.to_datetime()
-        except:
-            date = datetime.fromtimestamp(timestamp.timestamp())
-    elif isinstance(timestamp, datetime):
-        date = timestamp
-    elif isinstance(timestamp, (int, float)):
-        # Timestamp Unix
-        date = datetime.fromtimestamp(timestamp)
+    date = parse_firestore_date(timestamp)
     
     if date is None:
         return "Date non spécifiée"
@@ -832,14 +864,12 @@ def get_html_template_voucher_purchaser(voucher: dict, voucher_id: str) -> str:
     expires_date = voucher.get("expiresAt")
     expires_formatted = "Date non spécifiée"
     if expires_date:
-        if isinstance(expires_date, dict):
-            seconds = expires_date.get("_seconds") or expires_date.get("seconds", 0)
-            if seconds:
-                expires_date = datetime.fromtimestamp(seconds)
-                expires_formatted = format_date_french(expires_date)
-        elif hasattr(expires_date, 'to_datetime'):
-            expires_date = expires_date.to_datetime()
-            expires_formatted = format_date_french(expires_date)
+        parsed_date = parse_firestore_date(expires_date)
+        if parsed_date:
+            expires_formatted = format_date_french(parsed_date)
+        else:
+            # Debug: log the actual format we received
+            print(f"DEBUG: Could not parse expiresAt: {type(expires_date)}, value: {expires_date}")
     
     return f"""
 <!DOCTYPE html>
@@ -918,14 +948,12 @@ def get_html_template_voucher_recipient(voucher: dict, voucher_id: str) -> str:
     expires_date = voucher.get("expiresAt")
     expires_formatted = "Date non spécifiée"
     if expires_date:
-        if isinstance(expires_date, dict):
-            seconds = expires_date.get("_seconds") or expires_date.get("seconds", 0)
-            if seconds:
-                expires_date = datetime.fromtimestamp(seconds)
-                expires_formatted = format_date_french(expires_date)
-        elif hasattr(expires_date, 'to_datetime'):
-            expires_date = expires_date.to_datetime()
-            expires_formatted = format_date_french(expires_date)
+        parsed_date = parse_firestore_date(expires_date)
+        if parsed_date:
+            expires_formatted = format_date_french(parsed_date)
+        else:
+            # Debug: log the actual format we received
+            print(f"DEBUG: Could not parse expiresAt: {type(expires_date)}, value: {expires_date}")
     
     return f"""
 <!DOCTYPE html>
@@ -951,7 +979,7 @@ def get_html_template_voucher_recipient(voucher: dict, voucher_id: str) -> str:
     </div>
     <div class="content">
       <p>Bonjour {voucher.get("recipientName", "")},</p>
-      <p>Vous avez reçu un bon cadeau Harmonya !</p>
+      <p>Vous avez reçu un bon cadeau Harmonya de la part de <strong>{voucher.get("purchaserName", "quelqu'un qui vous aime")}</strong> !</p>
       <div class="gift-box">
         <div class="amount">{voucher.get("amount", 0)}€</div>
         <p style="font-size: 18px; color: #6B4423; font-weight: bold;">
@@ -997,14 +1025,12 @@ def get_html_template_voucher_admin(voucher: dict, voucher_id: str) -> str:
     expires_date = voucher.get("expiresAt")
     expires_formatted = "Date non spécifiée"
     if expires_date:
-        if isinstance(expires_date, dict):
-            seconds = expires_date.get("_seconds") or expires_date.get("seconds", 0)
-            if seconds:
-                expires_date = datetime.fromtimestamp(seconds)
-                expires_formatted = format_date_french(expires_date)
-        elif hasattr(expires_date, 'to_datetime'):
-            expires_date = expires_date.to_datetime()
-            expires_formatted = format_date_french(expires_date)
+        parsed_date = parse_firestore_date(expires_date)
+        if parsed_date:
+            expires_formatted = format_date_french(parsed_date)
+        else:
+            # Debug: log the actual format we received
+            print(f"DEBUG: Could not parse expiresAt: {type(expires_date)}, value: {expires_date}")
     
     paid_date = voucher.get("paidAt")
     paid_formatted = "Non payé"

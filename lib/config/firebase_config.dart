@@ -1,10 +1,61 @@
-class FirebaseConfig {
-  static const String apiKey = "AIzaSyDCxVfj5v5J74aPkxggrs1DjhMxVjIyuBc";
-  static const String authDomain = "harmonya-fr.firebaseapp.com";
-  static const String projectId = "harmonya-fr";
-  static const String storageBucket = "harmonya-fr.firebasestorage.app";
-  static const String messagingSenderId = "798066243552";
-  static const String appId = "1:798066243552:web:c40e11753dab02369f1d85";
-  static const String measurementId = "G-4L6HBV1M02";
-}
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+/// Firebase Configuration
+/// 
+/// Values are loaded from environment variables (--dart-define) or .env file
+/// 
+/// For production, use --dart-define flags:
+/// flutter build web --dart-define=FIREBASE_API_KEY=your_key --dart-define=FIREBASE_AUTH_DOMAIN=your_domain ...
+class FirebaseConfig {
+  // Load from environment variables or .env file
+  static String get apiKey => 
+      const String.fromEnvironment('FIREBASE_API_KEY', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_API_KEY')
+      : dotenv.env['FIREBASE_API_KEY'] ?? '';
+  
+  static String get authDomain => 
+      const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_AUTH_DOMAIN')
+      : dotenv.env['FIREBASE_AUTH_DOMAIN'] ?? '';
+  
+  static String get projectId => 
+      const String.fromEnvironment('FIREBASE_PROJECT_ID', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_PROJECT_ID')
+      : dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
+  
+  static String get storageBucket => 
+      const String.fromEnvironment('FIREBASE_STORAGE_BUCKET', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_STORAGE_BUCKET')
+      : dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '';
+  
+  static String get messagingSenderId => 
+      const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID')
+      : dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
+  
+  static String get appId => 
+      const String.fromEnvironment('FIREBASE_APP_ID', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_APP_ID')
+      : dotenv.env['FIREBASE_APP_ID'] ?? '';
+  
+  static String get measurementId => 
+      const String.fromEnvironment('FIREBASE_MEASUREMENT_ID', 
+          defaultValue: '') != ''
+      ? const String.fromEnvironment('FIREBASE_MEASUREMENT_ID')
+      : dotenv.env['FIREBASE_MEASUREMENT_ID'] ?? '';
+  
+  /// Check if all required Firebase config values are set
+  static bool get isConfigured => 
+      apiKey.isNotEmpty &&
+      authDomain.isNotEmpty &&
+      projectId.isNotEmpty &&
+      storageBucket.isNotEmpty &&
+      messagingSenderId.isNotEmpty &&
+      appId.isNotEmpty;
+}

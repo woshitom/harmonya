@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'config/firebase_config.dart';
 import 'theme/app_theme.dart';
 import 'pages/landing_page.dart';
@@ -11,16 +12,27 @@ import 'pages/admin_panel_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Configure web plugins
   usePathUrlStrategy();
-  
+
+  // Load environment variables from .env file (if available)
+  // This is optional - values can also come from --dart-define flags
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    // .env file not found, that's okay - will use --dart-define values
+    debugPrint(
+      'Note: .env file not found. Using --dart-define values or defaults.',
+    );
+  }
+
   // Initialize date formatting for French locale
   await initializeDateFormatting('fr_FR', null);
-  
+
   // Initialize Firebase
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
+    options: FirebaseOptions(
       apiKey: FirebaseConfig.apiKey,
       authDomain: FirebaseConfig.authDomain,
       projectId: FirebaseConfig.projectId,
@@ -30,7 +42,7 @@ void main() async {
       measurementId: FirebaseConfig.measurementId,
     ),
   );
-  
+
   runApp(const MyApp());
 }
 
@@ -49,10 +61,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('fr', 'FR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('fr', 'FR'), Locale('en', 'US')],
       home: const AuthWrapper(),
     );
   }
@@ -69,10 +78,10 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         // Check current user synchronously for immediate check
         final User? user = FirebaseAuth.instance.currentUser;
-        
+
         // Use snapshot data if available, otherwise fall back to currentUser
         final User? currentUser = snapshot.hasData ? snapshot.data : user;
-        
+
         if (currentUser != null) {
           // User is logged in, show admin panel
           return const AdminPanelPage();

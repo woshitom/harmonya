@@ -64,6 +64,8 @@ ENV/
 # Environment variables
 .env
 .env.local
+# Keep .env.example for reference
+!.env.example
 
 # IDE
 .vscode/

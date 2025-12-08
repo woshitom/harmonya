@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:html' as html;
+import 'dart:js' as js;
 import '../models/gift_voucher.dart';
 import '../services/firebase_service.dart';
 import '../config/paypal_config.dart';
-import 'paypal_button_widget.dart';
+import '../pages/paypal_payment_page.dart';
 
 class GiftVoucherForm extends StatefulWidget {
   final bool isSmallScreen;
@@ -75,30 +76,190 @@ class _GiftVoucherFormState extends State<GiftVoucherForm> {
     }
 
     // Load PayPal SDK
-    final script = html.ScriptElement()
-      ..src = PayPalConfig.sdkUrl
-      ..type = 'text/javascript';
+    final scriptUrl = PayPalConfig.sdkUrl;
+    final clientId = PayPalConfig.clientId;
+    print('Loading PayPal SDK from: $scriptUrl'); // Debug
+    print(
+      'PayPal Client ID: ${clientId.substring(0, 20)}...',
+    ); // Debug (first 20 chars)
 
-    html.document.head!.append(script);
-
-    script.onLoad.listen((_) {
-      setState(() {
-        _paypalScriptLoaded = true;
-      });
-    });
-
-    script.onError.listen((_) {
+    // Verify client ID is not empty
+    if (clientId.isEmpty || clientId == 'YOUR_CLIENT_ID') {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Erreur lors du chargement de PayPal. Veuillez vérifier votre connexion internet.',
+              'PayPal Client ID non configuré. Vérifiez votre fichier .env',
             ),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Remove crossOrigin - PayPal SDK doesn't need it and it might cause issues
+    final script = html.ScriptElement()
+      ..src = scriptUrl
+      ..type = 'text/javascript'
+      ..async =
+          false // Try synchronous loading
+      ..defer = false;
+
+    // Set up error handler BEFORE appending
+    script.onError.listen((event) {
+      print('PayPal script load error: $event'); // Debug
+      html.window.console.error(
+        'PayPal SDK failed to load. Check URL: $scriptUrl. Error: $event',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erreur lors du chargement de PayPal. Vérifiez la console pour plus de détails.',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     });
+
+    // Set up load handler BEFORE appending
+    script.onLoad.listen((event) {
+      print('PayPal script tag loaded successfully'); // Debug
+      html.window.console.log(
+        'PayPal script loaded, waiting for SDK initialization... Event: $event',
+      );
+
+      // Check immediately after load with multiple delays
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _checkPayPalSDK('100ms after load');
+      });
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _checkPayPalSDK('500ms after load');
+      });
+
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        _checkPayPalSDK('1s after load');
+      });
+
+      // Don't set _paypalScriptLoaded here - wait for SDK to be available
+      // The _waitForPayPalScript will check for actual SDK availability
+    });
+
+    html.document.head!.append(script);
+    html.window.console.log('PayPal script tag added to DOM: $scriptUrl');
+    html.window.console.log('Script element HTML: ${script.outerHtml}');
+
+    // Also check if script was actually added
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final addedScript = html.document.querySelector('script[src*="paypal"]');
+      if (addedScript != null) {
+        html.window.console.log('Script confirmed in DOM');
+        final scriptSrc = (addedScript as html.ScriptElement).src;
+        html.window.console.log('Script src: $scriptSrc');
+      } else {
+        html.window.console.error('Script NOT found in DOM after adding!');
+      }
+    });
+
+    // Also check the script element after a delay
+    Future.delayed(const Duration(seconds: 2), () {
+      final scriptElement = html.document.querySelector(
+        'script[src*="paypal"]',
+      );
+      if (scriptElement != null) {
+        final outerHtml = scriptElement.outerHtml ?? '';
+        final displayHtml = outerHtml.length > 100
+            ? outerHtml.substring(0, 100)
+            : outerHtml;
+        html.window.console.log('Script element found in DOM: $displayHtml');
+        // Check if script has any error attributes or status
+        html.window.console.log('Checking if script executed...');
+        try {
+          final result = js.context.callMethod('eval', ['typeof paypal']);
+          html.window.console.log('typeof paypal after 2 seconds: $result');
+        } catch (e) {
+          html.window.console.error('Error checking paypal type: $e');
+        }
+      }
+    });
+  }
+
+  void _checkPayPalSDK(String timing) {
+    try {
+      final paypalCheck = js.context.callMethod('eval', [
+        'typeof paypal !== "undefined" ? "exists" : "missing"',
+      ]);
+      html.window.console.log('PayPal object check ($timing): $paypalCheck');
+
+      if (paypalCheck == 'exists') {
+        final buttonsCheck = js.context.callMethod('eval', [
+          'typeof paypal.Buttons !== "undefined" ? "exists" : "missing"',
+        ]);
+        html.window.console.log(
+          'PayPal.Buttons check ($timing): $buttonsCheck',
+        );
+
+        if (buttonsCheck == 'exists' && mounted) {
+          setState(() {
+            _paypalScriptLoaded = true;
+          });
+        }
+      }
+    } catch (e) {
+      html.window.console.error('Error checking PayPal ($timing): $e');
+    }
+  }
+
+  Future<void> _waitForPayPalScript() async {
+    // Wait for PayPal script to load, with timeout
+    const maxWait = Duration(seconds: 15); // Increased timeout
+    const checkInterval = Duration(milliseconds: 300);
+    final startTime = DateTime.now();
+
+    while (DateTime.now().difference(startTime) < maxWait) {
+      if (!mounted) return;
+
+      // Check if script tag exists
+      final scripts = html.document.querySelectorAll('script[src*="paypal"]');
+      if (scripts.isNotEmpty) {
+        // Check if PayPal SDK is available
+        try {
+          // Use a delay to let the script execute
+          await Future.delayed(const Duration(milliseconds: 800));
+          // Try to access PayPal using eval
+          final result = js.context.callMethod('eval', [
+            'typeof paypal !== "undefined" && typeof paypal.Buttons !== "undefined" ? "ready" : "notready"',
+          ]);
+          if (result == 'ready') {
+            setState(() {
+              _paypalScriptLoaded = true;
+            });
+            return;
+          }
+        } catch (e) {
+          // PayPal not ready yet, continue waiting
+        }
+      }
+      await Future.delayed(checkInterval);
+    }
+
+    // Timeout reached
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Timeout lors du chargement de PayPal. Veuillez rafraîchir la page.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   Future<void> _handlePayPalPayment() async {
@@ -117,6 +278,12 @@ class _GiftVoucherFormState extends State<GiftVoucherForm> {
     });
 
     try {
+      // Ensure PayPal script is loaded before showing dialog
+      if (!_paypalScriptLoaded) {
+        // Wait for script to load (with timeout)
+        await _waitForPayPalScript();
+      }
+
       // Create voucher with pending status
       final expiresAt = DateTime.now().add(const Duration(days: 365));
       final voucher = GiftVoucher(
@@ -199,61 +366,27 @@ class _GiftVoucherFormState extends State<GiftVoucherForm> {
     );
   }
 
-  void _showPayPalDialog(String voucherId, double amount) {
-    final containerId = 'paypal-container-$voucherId';
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text('Paiement PayPal'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Montant: ${NumberFormat.currency(symbol: '€', decimalDigits: 2).format(amount)}',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 24),
-                  PayPalButtonWidget(
-                    containerId: containerId,
-                    amount: amount,
-                    voucherId: voucherId,
-                    onPaymentSuccess: (orderId) async {
-                      Navigator.of(context).pop();
-                      await _handlePaymentSuccess(voucherId, orderId);
-                    },
-                    onPaymentError: (error) {
-                      Navigator.of(context).pop();
-                      _handlePaymentError(error);
-                    },
-                    onCancel: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Annuler'),
-              ),
-            ],
-          ),
-        ),
+  Future<void> _showPayPalDialog(String voucherId, double amount) async {
+    // Navigate to full-page PayPal payment screen
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) =>
+            PayPalPaymentPage(voucherId: voucherId, amount: amount),
       ),
     );
+
+    // Handle payment result
+    if (result == true) {
+      // Payment was successful - PayPalPaymentPage already handled the payment
+      // Just show success message
+      if (mounted) {
+        await _handlePaymentSuccess(voucherId, '');
+      }
+    } else if (result == false) {
+      // Payment failed (error already shown in PayPalPaymentPage)
+      // No need to show error again
+    }
+    // If result is null, user cancelled (no action needed)
   }
 
   Future<void> _handlePaymentSuccess(String voucherId, String orderId) async {
@@ -325,7 +458,7 @@ class _GiftVoucherFormState extends State<GiftVoucherForm> {
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('Parfait'),
+                    child: const Text('Ok'),
                   ),
                 ],
               ),
