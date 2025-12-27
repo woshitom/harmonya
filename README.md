@@ -28,6 +28,7 @@ Administrators can manage bookings, moderate reviews, manage customers and gift 
 - **Review system** allowing visitors to leave testimonials with first name and last name
 - **Display of approved reviews** to read feedback from other clients
 - **Gift voucher purchase** with PayPal payment
+- **Contact form** to send messages directly to the salon
 - **Contact information** (clickable address for Google Maps, clickable phone number)
 
 ### For Administrators
@@ -39,6 +40,7 @@ Administrators can manage bookings, moderate reviews, manage customers and gift 
   - Status modification (pending, confirmed, cancelled)
   - Booking deletion
   - Badge showing number of pending bookings
+  - Closed days management (mark specific dates as unavailable)
 - **Review moderation**:
   - View reviews pending approval
   - Approve or reject reviews with confirmation dialog
@@ -51,6 +53,19 @@ Administrators can manage bookings, moderate reviews, manage customers and gift 
   - List of all gift vouchers
   - Status tracking (pending, paid, used, expired)
   - Information about purchaser and recipient
+- **Service management** (Massages & Treatments):
+  - Manage both massages and treatments (soins) in separate tabs
+  - Create, edit, and delete services
+  - Drag-and-drop reordering with simplified drag preview (shows only titles)
+  - Image upload for services (Firebase Storage)
+  - Multiple price options per service (duration/price combinations)
+  - Mark services as "Best Seller" or "New"
+  - Custom ordering for display on homepage
+- **Contact messages management**:
+  - View all contact form submissions
+  - Mark messages as read/unread
+  - Badge showing number of unread messages
+  - Reply functionality
 - **Navigation** to homepage while remaining logged in
 
 ## 🛠️ Technologies Used
@@ -58,19 +73,22 @@ Administrators can manage bookings, moderate reviews, manage customers and gift 
 ### Frontend
 - **Flutter Web** - Cross-platform development framework
 - **Firebase SDK**:
-  - **Firestore** - Database for bookings, reviews, customers and gift vouchers
+  - **Firestore** - Database for bookings, reviews, customers, gift vouchers, services, and contact messages
   - **Firebase Auth** - Administrator authentication
+  - **Firebase Storage** - Image storage for services
 - **table_calendar** - Calendar display in admin panel
 - **intl** - French date formatting
 - **url_launcher** - Opening Google Maps and phone app
 - **flutter_dotenv** - Environment variable management
 - **PayPal Checkout SDK** - PayPal integration for payments
+- **image_picker** - Image selection for service uploads
 
 ### Backend
 - **Firebase Cloud Functions (Python)** - Serverless functions for:
-  - Automatic email sending (bookings, reviews, gift vouchers)
+  - Automatic email sending (bookings, reviews, gift vouchers, contact messages)
   - Customer management when booking is confirmed
   - PayPal webhook for payment confirmation
+  - Customer treatment name updates when services are modified
 - **Resend API** - Transactional email service
 
 ## 📋 Prerequisites
@@ -154,7 +172,9 @@ harmonya/
 │   │   ├── booking.dart              # Booking data model
 │   │   ├── review.dart               # Review data model
 │   │   ├── customer.dart             # Customer data model
-│   │   └── gift_voucher.dart        # Gift voucher data model
+│   │   ├── gift_voucher.dart        # Gift voucher data model
+│   │   ├── massage.dart             # Massage/Treatment data model (with image, badges, ordering)
+│   │   └── closed_day.dart         # Closed days data model
 │   ├── pages/
 │   │   ├── landing_page.dart         # Main homepage
 │   │   ├── admin_login_page.dart     # Admin login page
@@ -172,10 +192,16 @@ harmonya/
 │       ├── massage_card.dart         # Massage presentation card
 │       ├── gift_voucher_form.dart    # Gift voucher purchase form
 │       ├── paypal_button_widget.dart # PayPal widget
+│       ├── contact_form.dart         # Contact form widget
 │       ├── admin_booking_list.dart   # Booking list (admin)
 │       ├── admin_booking_calendar.dart # Booking calendar (admin)
 │       ├── admin_review_list.dart    # Pending reviews list (admin)
 │       ├── admin_voucher_list.dart   # Gift vouchers list (admin)
+│       ├── admin_services.dart       # Services management tabs (admin)
+│       ├── admin_service_list.dart   # Service list with drag-and-drop (admin)
+│       ├── admin_massage_list.dart   # Massage management (admin, legacy)
+│       ├── admin_closed_days.dart    # Closed days management (admin)
+│       ├── admin_contact_messages.dart # Contact messages management (admin)
 │       └── customers.dart            # Customer management (admin)
 ├── functions/
 │   ├── main.py                       # Python Cloud Functions
@@ -189,7 +215,18 @@ harmonya/
 └── firebase.json                     # Firebase configuration
 ```
 
-## 🎨 Massage Types
+## 🎨 Service Management
+
+Services (massages and treatments) are now fully manageable through the admin panel:
+
+- **Dynamic service creation**: Administrators can add, edit, and delete services
+- **Custom ordering**: Drag-and-drop interface to reorder services (displayed on homepage)
+- **Multiple pricing options**: Each service can have multiple duration/price combinations
+- **Image support**: Upload images for services (stored in Firebase Storage)
+- **Badges**: Mark services as "Best Seller" or "New" for highlighting
+- **Two categories**: Separate management for Massages and Treatments (Soins)
+
+### Example Massage Types (configurable via admin panel)
 
 1. **Découverte** - €45 / 30 min
    - Areas: neck, back, shoulders, legs
@@ -215,6 +252,7 @@ The system automatically sends emails via Resend:
 - **Booking confirmed/cancelled**: Email to client
 - **New review**: Email to admin
 - **Gift voucher paid**: Emails to purchaser, recipient and admin
+- **New contact message**: Email to admin
 
 See `EMAIL_SETUP.md` for detailed configuration.
 
@@ -321,6 +359,10 @@ The following indexes are created automatically or can be created manually:
 - Collection `reviews`: composite index on `approved` + `createdAt`
 - Collection `bookings`: index on `date` + `time` (to avoid duplicates)
 - Collection `bookings`: index on `createdAt` (for sorting)
+- Collection `massages`: index on `order` (for custom ordering)
+- Collection `treatments`: index on `order` (for custom ordering)
+- Collection `closed_days`: index on `date` (for date queries)
+- Collection `contact_messages`: index on `read` + `createdAt` (for filtering unread messages)
 
 ## 📝 Important Notes
 
@@ -330,6 +372,10 @@ The following indexes are created automatically or can be created manually:
 - Application is optimized for web and uses responsive design
 - Gift vouchers expire after 1 year
 - Emails are sent automatically via Firebase Cloud Functions
+- Services can be reordered via drag-and-drop in the admin panel
+- Service images are stored in Firebase Storage (max 2MB per image)
+- Closed days can be marked to prevent bookings on specific dates
+- Contact messages are stored in Firestore and can be marked as read/unread
 
 ## 🐛 Troubleshooting
 
@@ -343,6 +389,15 @@ The following indexes are created automatically or can be created manually:
 
 ### Dates not displaying correctly
 - Verify that `initializeDateFormatting('fr_FR')` is called in `main.dart`
+
+### Service drag-and-drop not working
+- Ensure Firestore indexes are created for `massages` and `treatments` collections on `order` field
+- Check browser console for errors during drag operations
+
+### Service images not uploading
+- Verify Firebase Storage rules allow uploads
+- Check image size (max 2MB)
+- Ensure Firebase Storage is properly configured in Firebase Console
 
 ## 📄 License
 

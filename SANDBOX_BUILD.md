@@ -100,7 +100,7 @@ After deployment, you can test payments:
    - CVV: Any 3 digits (e.g., `123`)
 
 3. **Verify payments:**
-   - Check Firestore `gift_vouchers` collection
+   - Check Firestore `giftVouchers` collection
    - Status should change to `paid`
    - Check Firebase Functions logs for webhook events
    - Verify emails are sent (if configured)

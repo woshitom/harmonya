@@ -4,6 +4,9 @@ class Customer {
   final String name;
   final String phone;
   final List<String> massageTypes;
+  final List<String> treatmentTypes;
+  final List<String> massageTypesNames;
+  final List<String> treatmentTypesNames;
 
   Customer({
     required this.id,
@@ -11,6 +14,9 @@ class Customer {
     required this.name,
     required this.phone,
     required this.massageTypes,
+    this.treatmentTypes = const [],
+    this.massageTypesNames = const [],
+    this.treatmentTypesNames = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -19,6 +25,9 @@ class Customer {
       'name': name,
       'phone': phone,
       'massageTypes': massageTypes,
+      'treatmentTypes': treatmentTypes,
+      'massageTypesNames': massageTypesNames,
+      'treatmentTypesNames': treatmentTypesNames,
     };
   }
 
@@ -29,6 +38,9 @@ class Customer {
       name: map['name'] ?? '',
       phone: map['phone'] ?? '',
       massageTypes: List<String>.from(map['massageTypes'] ?? []),
+      treatmentTypes: List<String>.from(map['treatmentTypes'] ?? []),
+      massageTypesNames: List<String>.from(map['massageTypesNames'] ?? []),
+      treatmentTypesNames: List<String>.from(map['treatmentTypesNames'] ?? []),
     );
   }
 
@@ -38,6 +50,9 @@ class Customer {
     String? name,
     String? phone,
     List<String>? massageTypes,
+    List<String>? treatmentTypes,
+    List<String>? massageTypesNames,
+    List<String>? treatmentTypesNames,
   }) {
     return Customer(
       id: id ?? this.id,
@@ -45,6 +60,9 @@ class Customer {
       name: name ?? this.name,
       phone: phone ?? this.phone,
       massageTypes: massageTypes ?? this.massageTypes,
+      treatmentTypes: treatmentTypes ?? this.treatmentTypes,
+      massageTypesNames: massageTypesNames ?? this.massageTypesNames,
+      treatmentTypesNames: treatmentTypesNames ?? this.treatmentTypesNames,
     );
   }
 }

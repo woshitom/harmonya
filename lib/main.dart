@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -31,23 +32,53 @@ void main() async {
   await initializeDateFormatting('fr_FR', null);
 
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: FirebaseOptions(
-      apiKey: FirebaseConfig.apiKey,
-      authDomain: FirebaseConfig.authDomain,
-      projectId: FirebaseConfig.projectId,
-      storageBucket: FirebaseConfig.storageBucket,
-      messagingSenderId: FirebaseConfig.messagingSenderId,
-      appId: FirebaseConfig.appId,
-      measurementId: FirebaseConfig.measurementId,
-    ),
-  );
+  try {
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: FirebaseConfig.apiKey,
+        authDomain: FirebaseConfig.authDomain,
+        projectId: FirebaseConfig.projectId,
+        storageBucket: FirebaseConfig.storageBucket,
+        messagingSenderId: FirebaseConfig.messagingSenderId,
+        appId: FirebaseConfig.appId,
+        measurementId: FirebaseConfig.measurementId,
+      ),
+    );
+    
+    // Log Firebase initialization status
+    if (FirebaseConfig.isConfigured) {
+      debugPrint('✅ Firebase initialized successfully');
+      debugPrint('   Project ID: ${FirebaseConfig.projectId}');
+      debugPrint('   Auth Domain: ${FirebaseConfig.authDomain}');
+      debugPrint('   Current URL: ${Uri.base}');
+      debugPrint('   Host: ${Uri.base.host}');
+      debugPrint('   Port: ${Uri.base.port}');
+    } else {
+      debugPrint('⚠️ Firebase config incomplete. Some values may be missing.');
+    }
+
+    // Initialize Firebase Analytics
+    try {
+      final analytics = FirebaseAnalytics.instance;
+      await analytics.setAnalyticsCollectionEnabled(true);
+      debugPrint('✅ Firebase Analytics initialized successfully');
+    } catch (e) {
+      debugPrint('⚠️ Firebase Analytics initialization warning: $e');
+      // Don't rethrow - Analytics is not critical for app functionality
+    }
+  } catch (e) {
+    debugPrint('❌ Firebase initialization error: $e');
+    rethrow;
+  }
 
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  // Create Firebase Analytics instance
+  static final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +93,10 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('fr', 'FR'), Locale('en', 'US')],
+      // Enable automatic screen tracking
+      navigatorObservers: [
+        FirebaseAnalyticsObserver(analytics: analytics),
+      ],
       home: const AuthWrapper(),
     );
   }

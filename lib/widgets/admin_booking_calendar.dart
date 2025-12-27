@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/booking.dart';
+import '../models/closed_day.dart';
 import '../services/firebase_service.dart';
+import 'service_name_display.dart';
+import 'admin_closed_days.dart';
 
 class AdminBookingCalendar extends StatelessWidget {
   const AdminBookingCalendar({super.key});
@@ -13,33 +16,50 @@ class AdminBookingCalendar extends StatelessWidget {
 
     return StreamBuilder<List<Booking>>(
       stream: firebaseService.getBookings(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      builder: (context, bookingsSnapshot) {
+        return StreamBuilder<List<ClosedDay>>(
+          stream: firebaseService.getClosedDays(),
+          builder: (context, closedDaysSnapshot) {
+            if (bookingsSnapshot.connectionState == ConnectionState.waiting ||
+                closedDaysSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('Erreur: ${snapshot.error}'),
-          );
-        }
+            if (bookingsSnapshot.hasError) {
+              return Center(child: Text('Erreur: ${bookingsSnapshot.error}'));
+            }
 
-        final bookings = snapshot.data ?? [];
-        
-        // Group bookings by date
-        final Map<DateTime, List<Booking>> bookingsByDate = {};
-        for (final booking in bookings) {
-          final date = DateTime(
-            booking.date.year,
-            booking.date.month,
-            booking.date.day,
-          );
-          bookingsByDate.putIfAbsent(date, () => []).add(booking);
-        }
+            final bookings = bookingsSnapshot.data ?? [];
+            final closedDays = closedDaysSnapshot.data ?? [];
 
-        return _CalendarWidget(
-          bookingsByDate: bookingsByDate,
-          allBookings: bookings,
+            // Group bookings by date
+            final Map<DateTime, List<Booking>> bookingsByDate = {};
+            for (final booking in bookings) {
+              final date = DateTime(
+                booking.date.year,
+                booking.date.month,
+                booking.date.day,
+              );
+              bookingsByDate.putIfAbsent(date, () => []).add(booking);
+            }
+
+            // Group closed days by date
+            final Set<DateTime> closedDates = {};
+            for (final closedDay in closedDays) {
+              final date = DateTime(
+                closedDay.date.year,
+                closedDay.date.month,
+                closedDay.date.day,
+              );
+              closedDates.add(date);
+            }
+
+            return _CalendarWidget(
+              bookingsByDate: bookingsByDate,
+              allBookings: bookings,
+              closedDates: closedDates,
+            );
+          },
         );
       },
     );
@@ -49,10 +69,12 @@ class AdminBookingCalendar extends StatelessWidget {
 class _CalendarWidget extends StatefulWidget {
   final Map<DateTime, List<Booking>> bookingsByDate;
   final List<Booking> allBookings;
+  final Set<DateTime> closedDates;
 
   const _CalendarWidget({
     required this.bookingsByDate,
     required this.allBookings,
+    required this.closedDates,
   });
 
   @override
@@ -76,119 +98,224 @@ class _CalendarWidgetState extends State<_CalendarWidget> {
     return widget.bookingsByDate[date] ?? [];
   }
 
+  bool _isDayClosed(DateTime day) {
+    final dateOnly = DateTime(day.year, day.month, day.day);
+    return widget.closedDates.contains(dateOnly);
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedDayBookings = _getBookingsForDay(_selectedDay);
+    final isSelectedDayClosed = _isDayClosed(_selectedDay);
 
-    return Column(
+    return Stack(
       children: [
-        TableCalendar<Booking>(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: _focusedDay,
-          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-          calendarFormat: _calendarFormat,
-          eventLoader: _getBookingsForDay,
-          startingDayOfWeek: StartingDayOfWeek.monday,
-          locale: 'fr_FR',
-          headerStyle: HeaderStyle(
-            formatButtonVisible: true,
-            titleCentered: true,
-            formatButtonShowsNext: false,
-            formatButtonDecoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            formatButtonTextStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
-          calendarStyle: CalendarStyle(
-            outsideDaysVisible: false,
-            todayDecoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-              shape: BoxShape.circle,
-            ),
-            selectedDecoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              shape: BoxShape.circle,
-            ),
-            markerDecoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondary,
-              shape: BoxShape.circle,
-            ),
-            markersMaxCount: 3,
-            markerSize: 6,
-          ),
-          onDaySelected: (selectedDay, focusedDay) {
-            setState(() {
-              _selectedDay = selectedDay;
-              _focusedDay = focusedDay;
-            });
-          },
-          onFormatChanged: (format) {
-            setState(() {
-              _calendarFormat = format;
-            });
-          },
-          onPageChanged: (focusedDay) {
-            _focusedDay = focusedDay;
-          },
-        ),
-        const Divider(),
-        Expanded(
-          child: selectedDayBookings.isEmpty
-              ? Center(
-                  child: Text(
-                    'Aucune réservation pour le ${DateFormat('dd MMMM yyyy', 'fr').format(_selectedDay)}',
-                    style: Theme.of(context).textTheme.bodyLarge,
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminClosedDays(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.event_busy),
+                    label: const Text('Jours fermés'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: selectedDayBookings.length,
-                  itemBuilder: (context, index) {
-                    final booking = selectedDayBookings[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: _getStatusIcon(booking.status),
-                        title: Text(booking.name),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${booking.time} - ${booking.massageType}'),
-                            if (booking.isAtHome)
-                              Row(
-                                children: [
-                                  Icon(Icons.home, size: 14, color: Colors.blue),
-                                  const SizedBox(width: 4),
-                                  const Text('À domicile', style: TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                            Text(
-                              _getStatusLabel(booking.status),
-                              style: TextStyle(
-                                color: _getStatusColor(booking.status),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                ],
+              ),
+            ),
+            TableCalendar<Booking>(
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2030, 12, 31),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              calendarFormat: _calendarFormat,
+              eventLoader: _getBookingsForDay,
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              locale: 'fr_FR',
+              headerStyle: HeaderStyle(
+                formatButtonVisible:
+                    false, // Hide format button to restrict to month view
+                titleCentered: true,
+              ),
+              calendarStyle: CalendarStyle(
+                outsideDaysVisible: false,
+                todayDecoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                selectedDecoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondary,
+                  shape: BoxShape.circle,
+                ),
+                markersMaxCount: 3,
+                markerSize: 6,
+              ),
+              calendarBuilders: CalendarBuilders(
+                defaultBuilder: (context, date, events) {
+                  final dateOnly = DateTime(date.year, date.month, date.day);
+                  final isClosed = widget.closedDates.contains(dateOnly);
+
+                  if (isClosed) {
+                    return Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.red, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${date.day}',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed: () {
-                            _showBookingDetails(context, booking);
-                          },
-                        ),
-                        onTap: () {
-                          _showBookingDetails(context, booking);
-                        },
                       ),
                     );
-                  },
-                ),
+                  }
+                  return null;
+                },
+              ),
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+              },
+              onFormatChanged: (format) {
+                // Ignore format changes - always keep month view
+                // Don't update state to prevent format switching
+              },
+              onPageChanged: (focusedDay) {
+                _focusedDay = focusedDay;
+              },
+            ),
+            const Divider(),
+            Expanded(
+              child: isSelectedDayClosed
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_busy, size: 48, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Jour fermé',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            DateFormat(
+                              'EEEE dd MMMM yyyy',
+                              'fr',
+                            ).format(_selectedDay),
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    )
+                  : selectedDayBookings.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aucune réservation pour le ${DateFormat('dd MMMM yyyy', 'fr').format(_selectedDay)}',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: selectedDayBookings.length,
+                      itemBuilder: (context, index) {
+                        final booking = selectedDayBookings[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: _getStatusIcon(booking.status),
+                            title: Text(booking.name),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                FutureBuilder<Map<String, String>>(
+                                  future: getServiceNameAndLabel(booking),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return Text(
+                                        '${booking.time} - Chargement...',
+                                      );
+                                    }
+                                    if (snapshot.hasData) {
+                                      return Text(
+                                        '${booking.time} - ${snapshot.data!['name']!}',
+                                      );
+                                    }
+                                    return Text(
+                                      '${booking.time} - ${booking.massageType}',
+                                    );
+                                  },
+                                ),
+                                if (booking.isAtHome)
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.home,
+                                        size: 14,
+                                        color: Colors.blue,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'À domicile',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                Text(
+                                  _getStatusLabel(booking.status),
+                                  style: TextStyle(
+                                    color: _getStatusColor(booking.status),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () {
+                                _showBookingDetails(context, booking);
+                              },
+                            ),
+                            onTap: () {
+                              _showBookingDetails(context, booking);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ],
     );
@@ -241,9 +368,31 @@ class _CalendarWidgetState extends State<_CalendarWidget> {
             children: [
               _buildDetailRow('Email', booking.email),
               _buildDetailRow('Téléphone', booking.phone),
-              _buildDetailRow('Date', DateFormat('dd/MM/yyyy', 'fr').format(booking.date)),
+              _buildDetailRow(
+                'Date',
+                DateFormat('dd/MM/yyyy', 'fr').format(booking.date),
+              ),
               _buildDetailRow('Heure', booking.time),
-              _buildDetailRow('Type de massage', booking.massageType),
+              FutureBuilder<Map<String, String>>(
+                future: getServiceNameAndLabel(booking),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _buildDetailRow('Type de massage', 'Chargement...');
+                  }
+                  if (snapshot.hasData) {
+                    return _buildDetailRow(
+                      snapshot.data!['label']!,
+                      snapshot.data!['name']!,
+                    );
+                  }
+                  return _buildDetailRow(
+                    booking.serviceType == 'soins'
+                        ? 'Type de soins'
+                        : 'Type de massage',
+                    booking.massageType,
+                  );
+                },
+              ),
               _buildDetailRow('Statut', _getStatusLabel(booking.status)),
               if (booking.isAtHome) ...[
                 _buildDetailRow('Lieu', 'À domicile'),
@@ -285,4 +434,3 @@ class _CalendarWidgetState extends State<_CalendarWidget> {
     );
   }
 }
-

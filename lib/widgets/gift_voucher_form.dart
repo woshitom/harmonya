@@ -25,11 +25,11 @@ class _GiftVoucherFormState extends State<GiftVoucherForm> {
   final _messageController = TextEditingController();
   final _firebaseService = FirebaseService();
 
-  double _selectedAmount = 50.0;
+  double _selectedAmount = 45.0;
   bool _isSubmitting = false;
   bool _paypalScriptLoaded = false;
 
-  final List<double> _amountOptions = [50.0, 75.0, 95.0, 115.0, 150.0, 200.0];
+  final List<double> _amountOptions = [45.0, 60.0, 85.0, 95.0, 115.0];
 
   @override
   void initState() {

@@ -113,6 +113,13 @@ Then use `--dart-define` in your build command.
 - Verify `.env` file exists and has correct values
 - Check browser console for specific error messages
 
+### "Localhost requests blocked" error
+- **Common issue**: `[firebase_auth/requests-from-referer-http://localhost:58667-are-blocked.]`
+- **Solution**: Add `localhost` to authorized domains in Firebase Console
+  - Go to Firebase Console > Authentication > Settings > Authorized domains
+  - Click "Add domain" and enter `localhost`
+  - See `FIREBASE_LOCALHOST_SETUP.md` for detailed instructions
+
 ### "PayPal SDK not loaded" error
 - Verify `PAYPAL_CLIENT_ID` is set correctly
 - Check that `PAYPAL_ENVIRONMENT` is either 'sandbox' or 'production'

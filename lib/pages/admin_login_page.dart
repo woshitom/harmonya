@@ -44,10 +44,46 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       }
     } catch (e) {
       if (mounted) {
+        // Log detailed error information to console for debugging
+        final errorString = e.toString();
+        debugPrint('❌ Login error: $errorString');
+        debugPrint('   Current URL: ${Uri.base}');
+        debugPrint('   Host: ${Uri.base.host}');
+        debugPrint('   Port: ${Uri.base.port}');
+        
+        // Extract user-friendly error message
+        String errorMessage = 'Erreur de connexion';
+        if (errorString.contains('user-not-found')) {
+          errorMessage = 'Aucun compte trouvé avec cet email';
+        } else if (errorString.contains('wrong-password')) {
+          errorMessage = 'Mot de passe incorrect';
+        } else if (errorString.contains('invalid-email')) {
+          errorMessage = 'Email invalide';
+        } else if (errorString.contains('network-request-failed')) {
+          errorMessage = 'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+        } else if (errorString.contains('requests-from-referer') || 
+                   errorString.contains('are-blocked') ||
+                   errorString.contains('403 (Forbidden)')) {
+          errorMessage = '⚠️ Localhost bloqué: Les requêtes depuis localhost sont bloquées.\n\n'
+                        'Causes possibles:\n'
+                        '1. Restrictions de clé API (Google Cloud Console)\n'
+                        '   → Ajoutez "http://localhost:*/*" aux restrictions HTTP referrer\n\n'
+                        '2. Domaines autorisés (Firebase Console)\n'
+                        '   → Ajoutez "localhost" aux domaines autorisés\n\n'
+                        'Voir FIREBASE_LOCALHOST_SETUP.md pour les instructions détaillées.';
+        } else if (errorString.contains('auth/unauthorized-domain') || 
+                   errorString.contains('unauthorized-domain')) {
+          errorMessage = 'Domaine non autorisé: ${Uri.base.host} (port ${Uri.base.port}). '
+                        'Vérifiez que "localhost" et "127.0.0.1" sont dans les domaines autorisés Firebase.';
+        } else {
+          errorMessage = 'Erreur de connexion: $errorString';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur de connexion: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
           ),
         );
       }

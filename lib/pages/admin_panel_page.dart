@@ -4,6 +4,8 @@ import '../widgets/admin_booking_calendar.dart';
 import '../widgets/admin_review_list.dart';
 import '../widgets/customers.dart';
 import '../widgets/admin_voucher_list.dart';
+import '../widgets/admin_services.dart';
+import '../widgets/admin_contact_messages.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'landing_page.dart';
@@ -24,7 +26,7 @@ class _AdminPanelPageState extends State<AdminPanelPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
   }
 
   @override
@@ -54,9 +56,9 @@ class _AdminPanelPageState extends State<AdminPanelPage>
 
     if (confirmed == true) {
       await _authService.signOut();
-      // Pop back to root route (AuthWrapper) which will automatically show landing page
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+      // Pop back to landing page after logout
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
       }
     }
   }
@@ -161,6 +163,36 @@ class _AdminPanelPageState extends State<AdminPanelPage>
                     ? EdgeInsets.zero
                     : const EdgeInsets.only(bottom: 4),
               ),
+              Tab(
+                icon: const Icon(Icons.spa),
+                text: isSmallScreen ? null : 'Services',
+                iconMargin: isSmallScreen
+                    ? EdgeInsets.zero
+                    : const EdgeInsets.only(bottom: 4),
+              ),
+              StreamBuilder(
+                stream: _firebaseService.getContactMessages(),
+                builder: (context, snapshot) {
+                  int unreadCount = 0;
+                  if (snapshot.hasData) {
+                    unreadCount = snapshot.data!
+                        .where((message) =>
+                            (message['read'] as bool? ?? false) == false)
+                        .length;
+                  }
+                  return Tab(
+                    icon: Badge(
+                      isLabelVisible: unreadCount > 0,
+                      label: Text('$unreadCount'),
+                      child: const Icon(Icons.message),
+                    ),
+                    text: isSmallScreen ? null : 'Messages',
+                    iconMargin: isSmallScreen
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.only(bottom: 4),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -175,6 +207,8 @@ class _AdminPanelPageState extends State<AdminPanelPage>
             AdminReviewList(),
             Customers(),
             AdminVoucherList(),
+            AdminServices(),
+            AdminContactMessages(),
           ],
         ),
       ),

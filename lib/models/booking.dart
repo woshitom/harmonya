@@ -8,6 +8,9 @@ class Booking {
   final DateTime date;
   final String time;
   final String massageType;
+  final String? serviceType; // 'massage' or 'soins'
+  final String? serviceName; // The display name of the service (massage or treatment)
+  final int duration; // Duration in minutes
   final String notes;
   final bool isAtHome;
   final String homeAddress;
@@ -22,6 +25,9 @@ class Booking {
     required this.date,
     required this.time,
     required this.massageType,
+    this.serviceType,
+    this.serviceName,
+    required this.duration,
     required this.notes,
     this.isAtHome = false,
     this.homeAddress = '',
@@ -37,6 +43,9 @@ class Booking {
       'date': Timestamp.fromDate(date),
       'time': time,
       'massageType': massageType,
+      if (serviceType != null) 'serviceType': serviceType,
+      if (serviceName != null) 'serviceName': serviceName,
+      'duration': duration,
       'notes': notes,
       'isAtHome': isAtHome,
       'homeAddress': homeAddress,
@@ -54,6 +63,9 @@ class Booking {
       date: (map['date'] as Timestamp).toDate(),
       time: map['time'] ?? '',
       massageType: map['massageType'] ?? '',
+      serviceType: map['serviceType'] as String?,
+      serviceName: map['serviceName'] as String?,
+      duration: (map['duration'] as num?)?.toInt() ?? 60, // Default to 60 minutes if not set
       notes: map['notes'] ?? '',
       isAtHome: map['isAtHome'] ?? false,
       homeAddress: map['homeAddress'] ?? '',
@@ -70,6 +82,9 @@ class Booking {
     DateTime? date,
     String? time,
     String? massageType,
+    String? serviceType,
+    String? serviceName,
+    int? duration,
     String? notes,
     bool? isAtHome,
     String? homeAddress,
@@ -84,6 +99,9 @@ class Booking {
       date: date ?? this.date,
       time: time ?? this.time,
       massageType: massageType ?? this.massageType,
+      serviceType: serviceType ?? this.serviceType,
+      serviceName: serviceName ?? this.serviceName,
+      duration: duration ?? this.duration,
       notes: notes ?? this.notes,
       isAtHome: isAtHome ?? this.isAtHome,
       homeAddress: homeAddress ?? this.homeAddress,

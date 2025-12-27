@@ -100,13 +100,30 @@ def paypal_webhook(req: https_fn.Request) -> https_fn.Response:
             
             if custom_id:
                 # Update voucher status in Firestore
-                voucher_ref = db.collection("gift_vouchers").document(custom_id)
-                voucher_ref.update({
-                    "status": "paid",
-                    "paidAt": firestore.SERVER_TIMESTAMP,
-                    "paypalOrderId": order_id,
-                })
-                print(f"Updated voucher {custom_id} to paid status")
+                collection_name = "giftVouchers"  # Explicitly set collection name
+                print(f"DEBUG: Attempting to update voucher {custom_id} in collection '{collection_name}'")
+                voucher_ref = db.collection(collection_name).document(custom_id)
+                
+                # Check if document exists first
+                doc = voucher_ref.get()
+                if not doc.exists:
+                    print(f"ERROR: Voucher document {custom_id} does not exist in collection '{collection_name}'")
+                    return https_fn.Response(
+                        json.dumps({"error": f"Voucher {custom_id} not found in collection '{collection_name}'"}),
+                        status=404,
+                        mimetype="application/json"
+                    )
+                
+                try:
+                    voucher_ref.update({
+                        "status": "paid",
+                        "paidAt": firestore.SERVER_TIMESTAMP,
+                        "paypalOrderId": order_id,
+                    })
+                    print(f"Updated voucher {custom_id} to paid status in collection '{collection_name}'")
+                except Exception as update_error:
+                    print(f"ERROR updating voucher {custom_id}: {str(update_error)}")
+                    raise update_error
             else:
                 print(f"Warning: No custom_id found in webhook for order {order_id}")
             
@@ -152,11 +169,28 @@ def paypal_webhook(req: https_fn.Request) -> https_fn.Response:
             
             if custom_id:
                 # Update voucher status
-                voucher_ref = db.collection("gift_vouchers").document(custom_id)
-                voucher_ref.update({
-                    "status": "refunded",
-                })
-                print(f"Updated voucher {custom_id} to refunded status")
+                collection_name = "giftVouchers"  # Explicitly set collection name
+                print(f"DEBUG: Attempting to update voucher {custom_id} in collection '{collection_name}'")
+                voucher_ref = db.collection(collection_name).document(custom_id)
+                
+                # Check if document exists first
+                doc = voucher_ref.get()
+                if not doc.exists:
+                    print(f"ERROR: Voucher document {custom_id} does not exist in collection '{collection_name}'")
+                    return https_fn.Response(
+                        json.dumps({"error": f"Voucher {custom_id} not found in collection '{collection_name}'"}),
+                        status=404,
+                        mimetype="application/json"
+                    )
+                
+                try:
+                    voucher_ref.update({
+                        "status": "refunded",
+                    })
+                    print(f"Updated voucher {custom_id} to refunded status in collection '{collection_name}'")
+                except Exception as update_error:
+                    print(f"ERROR updating voucher {custom_id}: {str(update_error)}")
+                    raise update_error
             
             return https_fn.Response(
                 json.dumps({"status": "success"}),

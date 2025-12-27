@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/booking.dart';
+import '../models/massage.dart';
+import '../models/closed_day.dart';
 import '../services/firebase_service.dart';
 
 class BookingForm extends StatefulWidget {
@@ -9,6 +11,8 @@ class BookingForm extends StatefulWidget {
   final bool isSmallScreen;
   final bool showInDialog;
   final VoidCallback? onSuccess;
+  final String? initialServiceType; // 'massage' or 'soins'
+  final String? initialSelectedService; // Format: "serviceId_duration"
 
   const BookingForm({
     super.key,
@@ -17,6 +21,8 @@ class BookingForm extends StatefulWidget {
     required this.isSmallScreen,
     this.showInDialog = false,
     this.onSuccess,
+    this.initialServiceType,
+    this.initialSelectedService,
   });
 
   @override
@@ -33,39 +39,116 @@ class _BookingFormState extends State<BookingForm> {
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  String? _selectedMassageType;
+  String? _serviceType; // 'massage' or 'soins'
+  String?
+  _selectedMassageType; // Format: "massageId_duration" (e.g., "cocooning_60")
   bool _isAtHome = false;
 
-  final List<Map<String, String>> _massageTypes = [
-    {
-      'id': 'decouverte',
-      'name': 'Découverte',
-      'price': '45€',
-      'duration': '30 min',
-    },
-    {
-      'id': 'immersion',
-      'name': 'Immersion',
-      'price': '60€',
-      'duration': '60 min',
-    },
-    {'id': 'evasion', 'name': 'Evasion', 'price': '85€', 'duration': '90 min'},
-    {
-      'id': 'cocooning_60',
-      'name': 'Cocooning',
-      'price': '95€',
-      'duration': '60 min',
-    },
-    {
-      'id': 'cocooning_90',
-      'name': 'Cocooning',
-      'price': '115€',
-      'duration': '90 min',
-    },
-  ];
+  List<Massage> _massages = [];
+  List<Massage> _treatments = [];
+  List<ClosedDay> _closedDays = [];
+  bool _isLoadingMassages = true;
+  final _firebaseService = FirebaseService();
+
+  /// Get duration in minutes for a given massage type ID
+  /// Format: "massageId_duration" (e.g., "cocooning_60", "evasion_90")
+  int _getDurationForMassageType(String? massageTypeId) {
+    if (massageTypeId == null) return 60; // Default to 60 minutes
+
+    // Extract duration from format "massageId_duration"
+    final parts = massageTypeId.split('_');
+    if (parts.length >= 2) {
+      final durationStr = parts.last;
+      final duration = int.tryParse(durationStr);
+      if (duration != null) {
+        return duration;
+      }
+    }
+
+    // Fallback: try to find in services list (massages or treatments)
+    final allServices = [..._massages, ..._treatments];
+    for (final service in allServices) {
+      if (massageTypeId.startsWith(service.id)) {
+        // Find matching price option
+        for (final price in service.prices) {
+          if (service.getMassageOptionId(price.duration) == massageTypeId) {
+            return price.duration;
+          }
+        }
+      }
+    }
+
+    return 60; // Default to 60 minutes
+  }
+
+  /// Get all service options (each service can have multiple duration/price options)
+  List<Map<String, dynamic>> _getServiceOptions() {
+    final List<Map<String, dynamic>> options = [];
+    
+    // Use the appropriate list based on selected service type
+    final services = _serviceType == 'soins' ? _treatments : _massages;
+
+    for (final service in services) {
+      for (final price in service.prices) {
+        options.add({
+          'id': service.getMassageOptionId(price.duration),
+          'serviceId': service.id,
+          'name': service.name,
+          'price': price.price,
+          'duration': price.duration,
+        });
+      }
+    }
+
+    // Sort by service name, then by duration
+    options.sort((a, b) {
+      final nameCompare = (a['name'] as String).compareTo(b['name'] as String);
+      if (nameCompare != 0) return nameCompare;
+      return (a['duration'] as int).compareTo(b['duration'] as int);
+    });
+
+    return options;
+  }
 
   bool _isSubmitting = false;
-  final _firebaseService = FirebaseService();
+
+  Future<void> _loadMassages() async {
+    try {
+      final results = await Future.wait([
+        _firebaseService.getMassagesOnce(),
+        _firebaseService.getTreatmentsOnce(),
+        _firebaseService.getClosedDaysOnce(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _massages = results[0] as List<Massage>;
+          _treatments = results[1] as List<Massage>;
+          _closedDays = results[2] as List<ClosedDay>;
+          _isLoadingMassages = false;
+          // Ensure initial selection is set after services are loaded
+          if (widget.initialSelectedService != null) {
+            _selectedMassageType = widget.initialSelectedService;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading services: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingMassages = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _serviceType = widget.initialServiceType ?? 'massage';
+    _selectedMassageType = widget.initialSelectedService;
+    _loadMassages();
+  }
 
   @override
   void dispose() {
@@ -97,6 +180,15 @@ class _BookingFormState extends State<BookingForm> {
       }
     }
 
+    // Get closed days dates (only date part, no time)
+    final closedDates = _closedDays.map((closedDay) {
+      return DateTime(
+        closedDay.date.year,
+        closedDay.date.month,
+        closedDay.date.day,
+      );
+    }).toSet();
+
     final DateTime? picked = await showDatePicker(
       context: datePickerContext,
       initialDate: initialDate,
@@ -104,7 +196,17 @@ class _BookingFormState extends State<BookingForm> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
       selectableDayPredicate: (DateTime date) {
         // Disable Sundays (weekday 7 in Dart, where Monday is 1)
-        return date.weekday != DateTime.sunday;
+        if (date.weekday == DateTime.sunday) {
+          return false;
+        }
+        
+        // Disable closed days
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        if (closedDates.contains(dateOnly)) {
+          return false;
+        }
+        
+        return true;
       },
       // Force calendar mode only - disables manual date input
       initialEntryMode: DatePickerEntryMode.calendarOnly,
@@ -165,16 +267,49 @@ class _BookingFormState extends State<BookingForm> {
     // Fetch bookings for the selected date
     final bookings = await _firebaseService.getBookingsForDate(_selectedDate!);
 
-    // Get booked time slots (only confirmed and pending bookings, not cancelled)
-    final bookedSlots = bookings
+    // Get active bookings (only confirmed and pending bookings, not cancelled)
+    final activeBookings = bookings
         .where(
           (booking) => booking.status != 'cancelled' && booking.time.isNotEmpty,
         )
-        .map((booking) => booking.time)
-        .toSet();
+        .toList();
 
     final availableSlots = _getAvailableTimeSlots();
     final isSaturday = _selectedDate!.weekday == DateTime.saturday;
+
+    // Helper function to check if a time slot overlaps with any booking
+    bool _isSlotBlocked(String timeSlot, List<Booking> bookings) {
+      final slotParts = timeSlot.split(':');
+      final slotHour = int.parse(slotParts[0]);
+      final slotMinute = int.parse(slotParts[1]);
+      final slotTimeInMinutes = slotHour * 60 + slotMinute;
+
+      // Get the duration of the selected massage type (if any)
+      final selectedDuration = _selectedMassageType != null
+          ? _getDurationForMassageType(_selectedMassageType)
+          : 60; // Default to 60 minutes if no massage type selected
+
+      for (final booking in bookings) {
+        final bookingParts = booking.time.split(':');
+        final bookingHour = int.parse(bookingParts[0]);
+        final bookingMinute = int.parse(bookingParts[1]);
+        final bookingStartInMinutes = bookingHour * 60 + bookingMinute;
+        final bookingEndInMinutes = bookingStartInMinutes + booking.duration;
+
+        // Check if the slot overlaps with the booking
+        // Slot overlaps if:
+        // 1. Slot starts during the booking (slotStart >= bookingStart && slotStart < bookingEnd)
+        // 2. Slot ends during the booking (slotEnd > bookingStart && slotEnd <= bookingEnd)
+        // 3. Slot completely contains the booking (slotStart <= bookingStart && slotEnd >= bookingEnd)
+        final slotEndInMinutes = slotTimeInMinutes + selectedDuration;
+
+        if (slotTimeInMinutes < bookingEndInMinutes &&
+            slotEndInMinutes > bookingStartInMinutes) {
+          return true; // Overlaps
+        }
+      }
+      return false; // No overlap
+    }
 
     // When form is in dialog, use root navigator to show time picker above dialog
     BuildContext timePickerContext = context;
@@ -215,7 +350,7 @@ class _BookingFormState extends State<BookingForm> {
                         _selectedTime != null &&
                         '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}' ==
                             timeSlot;
-                    final isBooked = bookedSlots.contains(timeSlot);
+                    final isBooked = _isSlotBlocked(timeSlot, activeBookings);
 
                     return ElevatedButton(
                       onPressed: isBooked
@@ -311,10 +446,21 @@ class _BookingFormState extends State<BookingForm> {
       return;
     }
 
-    if (_selectedMassageType == null) {
+    if (_serviceType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez sélectionner un type de massage'),
+          content: Text('Veuillez sélectionner un type de service (Massage ou Soins)'),
+        ),
+      );
+      return;
+    }
+
+    if (_selectedMassageType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_serviceType == 'soins'
+              ? 'Veuillez sélectionner un type de soin'
+              : 'Veuillez sélectionner un type de massage'),
         ),
       );
       return;
@@ -325,6 +471,14 @@ class _BookingFormState extends State<BookingForm> {
     });
 
     try {
+      // Find the service name from the selected option
+      final serviceOptions = _getServiceOptions();
+      final selectedOption = serviceOptions.firstWhere(
+        (option) => option['id'] == _selectedMassageType,
+        orElse: () => {'name': ''},
+      );
+      final serviceName = selectedOption['name'] as String? ?? '';
+      
       final booking = Booking(
         name: _nameController.text.trim(),
         email: _emailController.text.trim().toLowerCase(),
@@ -333,6 +487,9 @@ class _BookingFormState extends State<BookingForm> {
         time:
             '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}',
         massageType: _selectedMassageType!,
+        serviceType: _serviceType,
+        serviceName: serviceName.isNotEmpty ? serviceName : null,
+        duration: _getDurationForMassageType(_selectedMassageType),
         notes: _notesController.text.trim(),
         isAtHome: _isAtHome,
         homeAddress: _isAtHome ? _homeAddressController.text.trim() : '',
@@ -546,32 +703,87 @@ class _BookingFormState extends State<BookingForm> {
             },
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedMassageType,
-            decoration: const InputDecoration(
-              labelText: 'Type de massage *',
-              prefixIcon: Icon(Icons.spa),
-            ),
-            items: _massageTypes.map((type) {
-              return DropdownMenuItem(
-                value: type['id'],
-                child: Text(
-                  '${type['name']} - ${type['price']} (${type['duration']})',
-                ),
-              );
-            }).toList(),
-            onChanged: (value) {
+          // Service Type Selection (Massage or Soins)
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'massage',
+                label: Text('Massage'),
+                icon: Icon(Icons.spa),
+              ),
+              ButtonSegment(
+                value: 'soins',
+                label: Text('Soins'),
+                icon: Icon(Icons.healing),
+              ),
+            ],
+            selected: {_serviceType ?? 'massage'},
+            onSelectionChanged: (Set<String> newSelection) {
               setState(() {
-                _selectedMassageType = value;
+                _serviceType = newSelection.first;
+                _selectedMassageType = null; // Reset selection when type changes
               });
             },
-            validator: (value) {
-              if (value == null) {
-                return 'Veuillez sélectionner un type de massage';
-              }
-              return null;
-            },
           ),
+          const SizedBox(height: 16),
+          _isLoadingMassages
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              : (_serviceType == 'soins' ? _treatments : _massages).isEmpty
+              ? Text(
+                  'Aucun ${_serviceType == 'soins' ? 'soin' : 'massage'} disponible pour le moment',
+                  style: const TextStyle(color: Colors.red),
+                )
+              : DropdownButtonFormField<String>(
+                  value: _selectedMassageType,
+                  decoration: InputDecoration(
+                    labelText: _serviceType == 'soins' 
+                        ? 'Type de soin *' 
+                        : 'Type de massage *',
+                    prefixIcon: const Icon(Icons.spa),
+                  ),
+                  items: _getServiceOptions().map((option) {
+                    return DropdownMenuItem(
+                      value: option['id'] as String,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          '${option['name']} - ${(option['price'] as double).toInt()}€ (${option['duration']} min)',
+                          softWrap: true,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMassageType = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return _serviceType == 'soins'
+                          ? 'Veuillez sélectionner un type de soin'
+                          : 'Veuillez sélectionner un type de massage';
+                    }
+                    return null;
+                  },
+                  isExpanded: true,
+                  menuMaxHeight: 400,
+                  selectedItemBuilder: (BuildContext context) {
+                    // This controls what's shown in the button itself (can be truncated)
+                    return _getServiceOptions().map((option) {
+                      return Text(
+                        '${option['name']} - ${(option['price'] as double).toInt()}€ (${option['duration']} min)',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      );
+                    }).toList();
+                  },
+                ),
           const SizedBox(height: 16),
           CheckboxListTile(
             title: const Text('Massage à domicile'),
@@ -726,13 +938,9 @@ class _BookingFormState extends State<BookingForm> {
     );
 
     if (widget.showInDialog) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(child: content),
-        ),
+      return Material(
+        type: MaterialType.canvas,
+        child: content,
       );
     }
 

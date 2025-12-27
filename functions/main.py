@@ -10,6 +10,7 @@ Installation:
 
 import os
 import json
+import time
 from datetime import datetime
 from typing import Any
 
@@ -24,16 +25,70 @@ initialize_app()
 
 # Configuration
 # IMPORTANT: Never hardcode API keys or secrets in source code!
-# Use environment variables or Firebase Functions config instead.
+# For Firebase Functions 2nd Gen Python, use secrets (firebase functions:secrets:set)
+# Secrets are accessed via os.environ when declared in function decorators
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "contact@harmonyamassage.fr")
 # Note: Resend doesn't allow free domains like gmail.com
 # Use onboarding@resend.dev for testing, or verify your own domain for production
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "Harmonya <contact@harmonyamassage.fr>")
 
-# Configurer Resend API Key
-if RESEND_API_KEY:
-    resend.api_key = RESEND_API_KEY
+# Helper function to get Resend API key from secrets or config
+def get_resend_api_key() -> str:
+    """Get Resend API key from environment variables (secrets)"""
+    # Try secret first (Firebase Functions 2nd Gen)
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if api_key:
+        # Strip whitespace (including newlines) that might have been included when setting the secret
+        return api_key.strip()
+    # Fallback: try to get from Firebase Functions config (for backward compatibility)
+    # Note: This might not work in 2nd Gen, but kept for compatibility
+    try:
+        import google.cloud.runtimeconfig
+        # This is a fallback - secrets are preferred
+        pass
+    except:
+        pass
+    return ""
+
+
+def get_service_name_and_label(booking: dict) -> tuple[str, str]:
+    """
+    Extrait le nom du service et le label approprié depuis les données de réservation
+    Retourne: (service_name, label)
+    """
+    massage_type = booking.get("massageType", "")
+    service_type = booking.get("serviceType", "massage")  # Default to 'massage'
+    
+    # Déterminer le label
+    label = "Type de soins:" if service_type == "soins" else "Type de massage:"
+    
+    # Si massageType est vide, retourner une valeur par défaut
+    if not massage_type:
+        return ("Non spécifié", label)
+    
+    # Extraire l'ID du service depuis le format "serviceId_duration"
+    # Exemple: "cocooning_60" -> service_id = "cocooning"
+    parts = massage_type.split('_')
+    service_id = parts[0] if parts else massage_type
+    
+    # Récupérer le nom du service depuis Firestore
+    try:
+        db = firestore.client()
+        collection_name = "treatments" if service_type == "soins" else "massages"
+        service_doc = db.collection(collection_name).document(service_id).get()
+        
+        if service_doc.exists:
+            service_data = service_doc.to_dict()
+            service_name = service_data.get("name", service_id)
+            return (service_name, label)
+        else:
+            # Si le document n'existe pas, retourner l'ID comme fallback
+            return (service_id, label)
+    except Exception as e:
+        print(f"Erreur lors de la récupération du nom du service: {str(e)}")
+        # En cas d'erreur, retourner l'ID comme fallback
+        return (service_id, label)
 
 
 def parse_firestore_date(date_value) -> datetime | None:
@@ -135,6 +190,9 @@ def get_html_template_admin(booking: dict, booking_id: str, date_formatted: str)
       </div>
         """
     
+    # Get service name and label
+    service_name, service_label = get_service_name_and_label(booking)
+    
     return f"""
 <!DOCTYPE html>
 <html>
@@ -173,7 +231,7 @@ def get_html_template_admin(booking: dict, booking_id: str, date_formatted: str)
         <span class="label">Heure:</span> {booking.get("time", "")}
       </div>
       <div class="info-row">
-        <span class="label">Type de massage:</span> {booking.get("massageType", "")}
+        <span class="label">{service_label}</span> {service_name}
       </div>
       {location_html}
       {notes_html}
@@ -217,6 +275,9 @@ def get_html_template_client(booking: dict, date_formatted: str) -> str:
       </div>
         """
     
+    # Get service name and label
+    service_name, service_label = get_service_name_and_label(booking)
+    
     return f"""
 <!DOCTYPE html>
 <html>
@@ -247,7 +308,7 @@ def get_html_template_client(booking: dict, date_formatted: str) -> str:
         <span class="label">Heure:</span> {booking.get("time", "")}
       </div>
       <div class="info-row">
-        <span class="label">Type de massage:</span> {booking.get("massageType", "")}
+        <span class="label">{service_label}</span> {service_name}
       </div>
       {location_html}
       <p style="margin-top: 20px;">
@@ -289,6 +350,9 @@ def get_html_template_confirmed(booking: dict, date_formatted: str) -> str:
       </div>
         """
     
+    # Get service name and label
+    service_name, service_label = get_service_name_and_label(booking)
+    
     return f"""
 <!DOCTYPE html>
 <html>
@@ -325,11 +389,11 @@ def get_html_template_confirmed(booking: dict, date_formatted: str) -> str:
         <span class="label">Heure:</span> {booking.get("time", "")}
       </div>
       <div class="info-row">
-        <span class="label">Type de massage:</span> {booking.get("massageType", "")}
+        <span class="label">{service_label}</span> {service_name}
       </div>
       {location_html}
       <p style="margin-top: 20px;">
-        {'Nous nous déplacerons à votre domicile pour ce massage.' if is_at_home else 'Nous avons hâte de vous accueillir à Harmonya.'} Si vous avez des questions ou souhaitez modifier votre réservation, n'hésitez pas à nous contacter.
+        {'Nous nous déplacerons à votre domicile pour ce service.' if is_at_home else 'Nous avons hâte de vous accueillir à Harmonya.'} Si vous avez des questions ou souhaitez modifier votre réservation, n'hésitez pas à nous contacter.
       </p>
       <p>Cordialement,<br><strong>L'équipe Harmonya</strong></p>
     </div>
@@ -367,6 +431,9 @@ def get_html_template_cancelled(booking: dict, date_formatted: str) -> str:
       </div>
         """
     
+    # Get service name and label
+    service_name, service_label = get_service_name_and_label(booking)
+    
     return f"""
 <!DOCTYPE html>
 <html>
@@ -403,7 +470,7 @@ def get_html_template_cancelled(booking: dict, date_formatted: str) -> str:
         <span class="label">Heure:</span> {booking.get("time", "")}
       </div>
       <div class="info-row">
-        <span class="label">Type de massage:</span> {booking.get("massageType", "")}
+        <span class="label">{service_label}</span> {service_name}
       </div>
       {location_html}
       <p style="margin-top: 20px;">
@@ -433,10 +500,34 @@ def create_or_update_customer(booking: dict, booking_id: str) -> None:
         customer_name = booking.get("name", "")
         customer_phone = booking.get("phone", "")
         massage_type = booking.get("massageType", "")
+        service_type = booking.get("serviceType", "")  # 'massage' or 'soins'
+        service_name = booking.get("serviceName", "")  # Service name from booking
         
         if not customer_email:
             print(f"Pas d'email trouvé dans la réservation {booking_id}, impossible de créer/mettre à jour le client")
             return
+        
+        # Extraire l'ID du service depuis le format "serviceId_duration"
+        # Exemple: "facial_60" -> service_id = "facial"
+        service_id = ""
+        if massage_type and massage_type.strip():
+            parts = massage_type.split('_')
+            service_id = parts[0] if parts else massage_type
+        
+        # Si serviceName n'est pas dans le booking, le récupérer depuis Firestore
+        if not service_name and service_id:
+            try:
+                db = firestore.client()
+                collection_name = "treatments" if service_type == "soins" else "massages"
+                service_doc = db.collection(collection_name).document(service_id).get()
+                if service_doc.exists:
+                    service_data = service_doc.to_dict()
+                    service_name = service_data.get("name", service_id)
+                else:
+                    service_name = service_id  # Fallback to ID if document not found
+            except Exception as e:
+                print(f"Erreur lors de la récupération du nom du service: {str(e)}")
+                service_name = service_id  # Fallback to ID on error
         
         db = firestore.client()
         customer_ref = db.collection("customers").document(customer_email)
@@ -446,25 +537,63 @@ def create_or_update_customer(booking: dict, booking_id: str) -> None:
             # Le document existe, mettre à jour
             customer_data = customer_doc.to_dict()
             massage_types = customer_data.get("massageTypes", [])
+            treatment_types = customer_data.get("treatmentTypes", [])
+            massage_types_names = customer_data.get("massageTypesNames", [])
+            treatment_types_names = customer_data.get("treatmentTypesNames", [])
             
-            # Ajouter le type de massage s'il n'est pas déjà dans le tableau
-            if massage_type and massage_type not in massage_types:
-                massage_types.append(massage_type)
+            # Déterminer si c'est un massage ou un traitement
+            is_treatment = service_type == "soins"
+            
+            # Ajouter le type de service (ID et nom) dans les bons tableaux s'il n'est pas vide
+            if service_id:
+                if is_treatment:
+                    # C'est un traitement
+                    if service_id not in treatment_types:
+                        treatment_types.append(service_id)
+                        treatment_types_names.append(service_name if service_name else service_id)
+                else:
+                    # C'est un massage
+                    if service_id not in massage_types:
+                        massage_types.append(service_id)
+                        massage_types_names.append(service_name if service_name else service_id)
             
             # Mettre à jour le document
             customer_ref.update({
                 "name": customer_name,
                 "phone": customer_phone,
                 "massageTypes": massage_types,
+                "treatmentTypes": treatment_types,
+                "massageTypesNames": massage_types_names,
+                "treatmentTypesNames": treatment_types_names,
             })
             print(f"Document client mis à jour pour {customer_email}")
         else:
             # Le document n'existe pas, le créer
+            # Déterminer si c'est un massage ou un traitement
+            is_treatment = service_type == "soins"
+            
+            # Créer les tableaux appropriés
+            massage_types_list = []
+            treatment_types_list = []
+            massage_types_names_list = []
+            treatment_types_names_list = []
+            
+            if service_id:
+                if is_treatment:
+                    treatment_types_list = [service_id]
+                    treatment_types_names_list = [service_name if service_name else service_id]
+                else:
+                    massage_types_list = [service_id]
+                    massage_types_names_list = [service_name if service_name else service_id]
+            
             customer_ref.set({
                 "email": customer_email,
                 "name": customer_name,
                 "phone": customer_phone,
-                "massageTypes": [massage_type] if massage_type else [],
+                "massageTypes": massage_types_list,
+                "treatmentTypes": treatment_types_list,
+                "massageTypesNames": massage_types_names_list,
+                "treatmentTypesNames": treatment_types_names_list,
                 "added_at": firestore.SERVER_TIMESTAMP,
             })
             print(f"Nouveau document client créé pour {customer_email}")
@@ -476,7 +605,8 @@ def create_or_update_customer(booking: dict, booking_id: str) -> None:
 
 @firestore_fn.on_document_created(
     document="bookings/{bookingId}",
-    region="europe-west9"
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
 )
 def send_booking_email(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """
@@ -514,12 +644,11 @@ def send_booking_email(event: firestore_fn.Event[firestore_fn.Change[firestore_f
             date_formatted = "Date non spécifiée"
         
         # Vérifier que Resend API Key est configurée
-        if not resend.api_key:
-            api_key = os.environ.get("RESEND_API_KEY", "")
-            if not api_key:
-                print(f"ERREUR: RESEND_API_KEY non configurée pour la réservation {booking_id}")
-                return
-            resend.api_key = api_key
+        api_key = get_resend_api_key()
+        if not api_key:
+            print(f"ERREUR: RESEND_API_KEY non configurée pour la réservation {booking_id}")
+            return
+        resend.api_key = api_key
         
         # Vérifier le statut de la réservation
         booking_status = booking.get("status", "en_attente")
@@ -596,7 +725,8 @@ def send_booking_email(event: firestore_fn.Event[firestore_fn.Change[firestore_f
 
 @firestore_fn.on_document_updated(
     document="bookings/{bookingId}",
-    region="europe-west9"
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
 )
 def send_booking_status_email(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """
@@ -649,12 +779,11 @@ def send_booking_status_email(event: firestore_fn.Event[firestore_fn.Change[fire
             date_formatted = "Date non spécifiée"
         
         # Vérifier que Resend API Key est configurée
-        if not resend.api_key:
-            api_key = os.environ.get("RESEND_API_KEY", "")
-            if not api_key:
-                print(f"ERREUR: RESEND_API_KEY non configurée pour la réservation {booking_id}")
-                return
-            resend.api_key = api_key
+        api_key = get_resend_api_key()
+        if not api_key:
+            print(f"ERREUR: RESEND_API_KEY non configurée pour la réservation {booking_id}")
+            return
+        resend.api_key = api_key
         
         # Envoyer l'email au client selon le statut
         client_email = booking_after.get("email")
@@ -779,7 +908,8 @@ def get_html_template_review_admin(review: dict, review_id: str, date_formatted:
 
 @firestore_fn.on_document_created(
     document="reviews/{reviewId}",
-    region="europe-west9"
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
 )
 def send_review_notification_email(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """
@@ -816,12 +946,11 @@ def send_review_notification_email(event: firestore_fn.Event[firestore_fn.Change
             date_formatted = "Date non spécifiée"
         
         # Vérifier que Resend API Key est configurée
-        if not resend.api_key:
-            api_key = os.environ.get("RESEND_API_KEY", "")
-            if not api_key:
-                print(f"ERREUR: RESEND_API_KEY non configurée pour le commentaire {review_id}")
-                return
-            resend.api_key = api_key
+        api_key = get_resend_api_key()
+        if not api_key:
+            print(f"ERREUR: RESEND_API_KEY non configurée pour le commentaire {review_id}")
+            return
+        resend.api_key = api_key
         
         # Envoyer l'email à l'administrateur
         try:
@@ -1101,9 +1230,157 @@ def get_html_template_voucher_admin(voucher: dict, voucher_id: str) -> str:
 """
 
 
+def _send_email_with_retry(email_data: dict, email_type: str, voucher_id: str, max_retries: int = 3) -> bool:
+    """
+    Helper function pour envoyer un email avec retry en cas de rate limit
+    Resend limite à 2 requêtes par seconde
+    """
+    for attempt in range(max_retries):
+        try:
+            result = resend.Emails.send(email_data)
+            print(f"Email {email_type} envoyé avec succès pour le bon cadeau {voucher_id}: {result}")
+            return True
+        except Exception as e:
+            error_str = str(e)
+            # Vérifier si c'est une erreur de rate limit
+            if "rate limit" in error_str.lower() or "too many requests" in error_str.lower():
+                if attempt < max_retries - 1:
+                    # Attendre avec backoff exponentiel: 0.6s, 1.2s, 2.4s
+                    wait_time = 0.6 * (2 ** attempt)
+                    print(f"Rate limit atteint pour {email_type}, attente de {wait_time}s avant retry (tentative {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"ERREUR: Rate limit toujours atteint après {max_retries} tentatives pour {email_type}")
+                    import traceback
+                    traceback.print_exc()
+                    return False
+            else:
+                # Autre erreur, ne pas retry
+                print(f"ERREUR lors de l'envoi de l'email {email_type}: {error_str}")
+                import traceback
+                traceback.print_exc()
+                return False
+    return False
+
+
+def _send_voucher_emails_helper(voucher: dict, voucher_id: str) -> None:
+    """
+    Helper function pour envoyer les emails de bon cadeau
+    Respecte la limite de rate de Resend (2 requêtes/seconde)
+    """
+    print(f"DEBUG _send_voucher_emails_helper: Début envoi emails pour voucher {voucher_id}")
+    
+    # Vérifier que Resend API Key est configurée
+    api_key = get_resend_api_key()
+    if not api_key:
+        print(f"ERREUR: RESEND_API_KEY non configurée pour le bon cadeau {voucher_id}")
+        return
+    resend.api_key = api_key
+    
+    # Envoyer l'email à l'acheteur (seulement si différent du destinataire)
+    purchaser_email = voucher.get("purchaserEmail")
+    recipient_email = voucher.get("recipientEmail")
+    
+    print(f"DEBUG _send_voucher_emails_helper: purchaser_email={purchaser_email}, recipient_email={recipient_email}")
+    
+    if not recipient_email:
+        print(f"ERREUR: Aucun email destinataire trouvé pour le bon cadeau {voucher_id}")
+        return
+    
+    # Liste des emails à envoyer (pour respecter le rate limit)
+    emails_to_send = []
+    
+    if purchaser_email and purchaser_email != recipient_email:
+        purchaser_html = get_html_template_voucher_purchaser(voucher, voucher_id)
+        emails_to_send.append({
+            "type": "acheteur",
+            "to": purchaser_email,
+            "subject": "Confirmation d'achat - Bon cadeau Harmonya",
+            "html": purchaser_html,
+        })
+    elif purchaser_email == recipient_email:
+        print(f"Email acheteur ignoré pour le bon cadeau {voucher_id} (même email que le destinataire)")
+    
+    # Email destinataire (prioritaire)
+    recipient_html = get_html_template_voucher_recipient(voucher, voucher_id)
+    emails_to_send.append({
+        "type": "destinataire",
+        "to": recipient_email,
+        "subject": "🎁 Vous avez reçu un bon cadeau Harmonya !",
+        "html": recipient_html,
+    })
+    
+    # Email admin
+    admin_html = get_html_template_voucher_admin(voucher, voucher_id)
+    emails_to_send.append({
+        "type": "admin",
+        "to": ADMIN_EMAIL,
+        "subject": f"Nouveau bon cadeau - {voucher.get('amount', 0)}€",
+        "html": admin_html,
+    })
+    
+    # Envoyer les emails avec délai entre chaque pour respecter le rate limit (2 req/s)
+    # Attendre 0.6 secondes entre chaque email pour être sûr de rester sous la limite
+    for i, email_info in enumerate(emails_to_send):
+        if i > 0:
+            # Attendre avant d'envoyer le prochain email (sauf pour le premier)
+            time.sleep(0.6)
+        
+        print(f"DEBUG _send_voucher_emails_helper: Envoi email {email_info['type']} à {email_info['to']}")
+        
+        email_data = {
+            "from": FROM_EMAIL,
+            "to": email_info["to"],
+            "subject": email_info["subject"],
+            "html": email_info["html"],
+        }
+        
+        _send_email_with_retry(email_data, email_info["type"], voucher_id)
+
+
+@firestore_fn.on_document_created(
+    document="giftVouchers/{voucherId}",
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
+)
+def send_voucher_emails_on_create(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    """
+    Fonction déclenchée automatiquement lorsqu'un bon cadeau est créé avec statut "paid"
+    Envoie des emails à l'acheteur, au destinataire et à l'admin
+    """
+    try:
+        snapshot = event.data
+        if snapshot is None:
+            print("Aucune donnée dans l'événement (create)")
+            return
+        
+        voucher = snapshot.to_dict()
+        voucher_id = snapshot.id
+        
+        if voucher is None:
+            print(f"Aucune donnée trouvée pour le bon cadeau {voucher_id} (create)")
+            return
+        
+        status = voucher.get("status") or "pending"
+        print(f"DEBUG send_voucher_emails_on_create: Voucher {voucher_id} créé avec statut: {status}")
+        
+        if status == "paid":
+            print(f"DEBUG send_voucher_emails_on_create: Voucher {voucher_id} créé avec statut 'paid', envoi des emails...")
+            _send_voucher_emails_helper(voucher, voucher_id)
+        else:
+            print(f"DEBUG send_voucher_emails_on_create: Voucher {voucher_id} créé avec statut '{status}', pas d'envoi d'email")
+                
+    except Exception as e:
+        print(f"Erreur générale dans send_voucher_emails_on_create: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
 @firestore_fn.on_document_updated(
-    document="gift_vouchers/{voucherId}",
-    region="europe-west9"
+    document="giftVouchers/{voucherId}",
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
 )
 def send_voucher_emails(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
     """
@@ -1113,7 +1390,7 @@ def send_voucher_emails(event: firestore_fn.Event[firestore_fn.Change[firestore_
     try:
         snapshot = event.data
         if snapshot is None:
-            print("Aucune donnée dans l'événement")
+            print("Aucune donnée dans l'événement (update)")
             return
         
         voucher_after = snapshot.after.to_dict()
@@ -1121,75 +1398,21 @@ def send_voucher_emails(event: firestore_fn.Event[firestore_fn.Change[firestore_
         voucher_id = snapshot.after.id
         
         if voucher_after is None:
-            print(f"Aucune donnée trouvée pour le bon cadeau {voucher_id}")
+            print(f"Aucune donnée trouvée pour le bon cadeau {voucher_id} (update)")
             return
         
         # Vérifier si le statut a changé de "pending" à "paid"
-        status_before = voucher_before.get("status", "pending")
-        status_after = voucher_after.get("status", "pending")
+        status_before = voucher_before.get("status") or "pending"
+        status_after = voucher_after.get("status") or "pending"
+        
+        print(f"DEBUG send_voucher_emails: Voucher {voucher_id} - Status before: {status_before}, Status after: {status_after}")
         
         if status_before != "paid" and status_after == "paid":
             # Le bon cadeau vient d'être payé, envoyer les emails
-            
-            # Vérifier que Resend API Key est configurée
-            if not resend.api_key:
-                api_key = os.environ.get("RESEND_API_KEY", "")
-                if not api_key:
-                    print(f"ERREUR: RESEND_API_KEY non configurée pour le bon cadeau {voucher_id}")
-                    return
-                resend.api_key = api_key
-            
-            # Envoyer l'email à l'acheteur
-            purchaser_email = voucher_after.get("purchaserEmail")
-            if purchaser_email:
-                try:
-                    purchaser_html = get_html_template_voucher_purchaser(voucher_after, voucher_id)
-                    
-                    result = resend.Emails.send({
-                        "from": FROM_EMAIL,
-                        "to": purchaser_email,
-                        "subject": "Confirmation d'achat - Bon cadeau Harmonya",
-                        "html": purchaser_html,
-                    })
-                    print(f"Email acheteur envoyé avec succès pour le bon cadeau {voucher_id}: {result}")
-                except Exception as e:
-                    print(f"Erreur lors de l'envoi de l'email à l'acheteur: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
-            
-            # Envoyer l'email au destinataire
-            recipient_email = voucher_after.get("recipientEmail")
-            if recipient_email:
-                try:
-                    recipient_html = get_html_template_voucher_recipient(voucher_after, voucher_id)
-                    
-                    result = resend.Emails.send({
-                        "from": FROM_EMAIL,
-                        "to": recipient_email,
-                        "subject": "🎁 Vous avez reçu un bon cadeau Harmonya !",
-                        "html": recipient_html,
-                    })
-                    print(f"Email destinataire envoyé avec succès pour le bon cadeau {voucher_id}: {result}")
-                except Exception as e:
-                    print(f"Erreur lors de l'envoi de l'email au destinataire: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
-            
-            # Envoyer l'email à l'admin
-            try:
-                admin_html = get_html_template_voucher_admin(voucher_after, voucher_id)
-                
-                result = resend.Emails.send({
-                    "from": FROM_EMAIL,
-                    "to": ADMIN_EMAIL,
-                    "subject": f"Nouveau bon cadeau - {voucher_after.get('amount', 0)}€",
-                    "html": admin_html,
-                })
-                print(f"Email admin envoyé avec succès pour le bon cadeau {voucher_id}: {result}")
-            except Exception as e:
-                print(f"Erreur lors de l'envoi de l'email admin: {str(e)}")
-                import traceback
-                traceback.print_exc()
+            print(f"DEBUG send_voucher_emails: Voucher {voucher_id} vient d'être payé, préparation des emails...")
+            _send_voucher_emails_helper(voucher_after, voucher_id)
+        else:
+            print(f"DEBUG send_voucher_emails: Voucher {voucher_id} - Pas de changement de statut vers 'paid' (before={status_before}, after={status_after})")
                 
     except Exception as e:
         print(f"Erreur générale dans send_voucher_emails: {str(e)}")
@@ -1197,10 +1420,539 @@ def send_voucher_emails(event: firestore_fn.Event[firestore_fn.Change[firestore_
         traceback.print_exc()
 
 
-@https_fn.on_request(
-    cors=True,
+def get_html_template_contact_message(contact: dict, contact_id: str, date_formatted: str) -> str:
+    """
+    Génère le template HTML pour l'email admin lors d'un nouveau message de contact
+    """
+    name = contact.get("name", "Non spécifié")
+    message = contact.get("message", "")
+    contact_method = contact.get("contactMethod", "")
+    email = contact.get("email", "")
+    phone = contact.get("phone", "")
+    
+    # Traduire la méthode de contact
+    contact_method_text = {
+        "email": "Par email",
+        "phone": "Par téléphone",
+        "no_answer": "Je n'ai pas besoin de réponse"
+    }.get(contact_method, contact_method)
+    
+    # Construire les informations de contact
+    contact_info_html = ""
+    if contact_method == "email" and email:
+        contact_info_html = f'<div class="info-row"><span class="label">Email:</span> {email}</div>'
+    elif contact_method == "phone" and phone:
+        contact_info_html = f'<div class="info-row"><span class="label">Téléphone:</span> {phone}</div>'
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }}
+            .header {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                text-align: center;
+                border-radius: 10px 10px 0 0;
+            }}
+            .content {{
+                background: #f9f9f9;
+                padding: 30px;
+                border-radius: 0 0 10px 10px;
+            }}
+            .info-row {{
+                margin: 15px 0;
+                padding: 10px;
+                background: white;
+                border-left: 4px solid #667eea;
+                border-radius: 4px;
+            }}
+            .label {{
+                font-weight: bold;
+                color: #667eea;
+                display: inline-block;
+                min-width: 150px;
+            }}
+            .message-box {{
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+                border-left: 4px solid #764ba2;
+            }}
+            .footer {{
+                text-align: center;
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid #ddd;
+                color: #666;
+                font-size: 12px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Nouveau Message de Contact</h1>
+        </div>
+        <div class="content">
+            <div class="info-row">
+                <span class="label">Nom:</span> {name}
+            </div>
+            <div class="info-row">
+                <span class="label">Date:</span> {date_formatted}
+            </div>
+            <div class="info-row">
+                <span class="label">Méthode de contact:</span> {contact_method_text}
+            </div>
+            {contact_info_html}
+            <div class="message-box">
+                <h3 style="margin-top: 0; color: #764ba2;">Message:</h3>
+                <p style="white-space: pre-wrap;">{message}</p>
+            </div>
+            <div class="info-row" style="background: #fff3cd; border-left-color: #ffc107;">
+                <span class="label">ID du message:</span> {contact_id}
+            </div>
+        </div>
+        <div class="footer">
+            <p>Ce message a été envoyé depuis le formulaire de contact du site Harmonya Massage.</p>
+        </div>
+    </body>
+    </html>
+    """
+
+
+@firestore_fn.on_document_created(
+    document="contactMessages/{contactId}",
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
+)
+def send_contact_message_email(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """
+    Fonction déclenchée automatiquement lorsqu'un nouveau message de contact est créé
+    Envoie un email à l'administrateur avec les détails du message
+    """
+    try:
+        # Récupérer les données du message de contact
+        snapshot = event.data
+        if snapshot is None:
+            print("Aucune donnée dans l'événement")
+            return
+        
+        contact = snapshot.to_dict()
+        contact_id = snapshot.id
+        
+        if contact is None:
+            print(f"Aucune donnée trouvée pour le message de contact {contact_id}")
+            return
+        
+        # Formater la date en français
+        date_timestamp = contact.get("createdAt")
+        if date_timestamp:
+            # Convertir Timestamp Firestore en datetime si nécessaire
+            if hasattr(date_timestamp, 'to_datetime'):
+                date_timestamp = date_timestamp.to_datetime()
+            elif isinstance(date_timestamp, dict):
+                # Format Firestore Timestamp
+                seconds = date_timestamp.get("_seconds") or date_timestamp.get("seconds", 0)
+                nanoseconds = date_timestamp.get("_nanoseconds") or date_timestamp.get("nanoseconds", 0)
+                date_timestamp = datetime.fromtimestamp(seconds + nanoseconds / 1e9)
+            date_formatted = format_date_french(date_timestamp)
+        else:
+            date_formatted = "Date non spécifiée"
+        
+        # Vérifier que Resend API Key est configurée
+        api_key = get_resend_api_key()
+        if not api_key:
+            print(f"ERREUR: RESEND_API_KEY non configurée pour le message de contact {contact_id}")
+            return
+        resend.api_key = api_key
+        
+        # Envoyer l'email à l'administrateur
+        try:
+            admin_html = get_html_template_contact_message(contact, contact_id, date_formatted)
+            
+            # Nom pour le sujet
+            name = contact.get("name", "Anonyme")
+            contact_method = contact.get("contactMethod", "")
+            
+            # Construire le sujet
+            subject = f"Nouveau message de contact de {name}"
+            if contact_method == "email":
+                email = contact.get("email", "")
+                if email:
+                    subject += f" ({email})"
+            elif contact_method == "phone":
+                phone = contact.get("phone", "")
+                if phone:
+                    subject += f" ({phone})"
+            
+            result = resend.Emails.send({
+                "from": FROM_EMAIL,
+                "to": ADMIN_EMAIL,
+                "subject": subject,
+                "html": admin_html,
+            })
+            print(f"Email admin envoyé avec succès pour le message de contact {contact_id}: {result}")
+        except Exception as e:
+            print(f"Erreur lors de l'envoi de l'email admin: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+    except Exception as e:
+        print(f"Erreur générale dans send_contact_message_email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+@firestore_fn.on_document_updated(
+    document="contactMessages/{contactId}",
+    region="europe-west9",
+    secrets=["RESEND_API_KEY"]
+)
+def send_contact_answer_email(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """
+    Fonction déclenchée lorsqu'un message de contact est mis à jour
+    Envoie un email au client avec la réponse si le message a été répondu
+    """
+    try:
+        # Récupérer les données avant et après la mise à jour
+        before_snapshot = event.data.before
+        after_snapshot = event.data.after
+        
+        if before_snapshot is None or after_snapshot is None:
+            print("Données manquantes dans l'événement de mise à jour")
+            return
+        
+        before_data = before_snapshot.to_dict()
+        after_data = after_snapshot.to_dict()
+        contact_id = after_snapshot.id
+        
+        if before_data is None or after_data is None:
+            print(f"Aucune donnée trouvée pour le message de contact {contact_id}")
+            return
+        
+        # Vérifier les conditions:
+        # 1. contactMethod == 'email'
+        contact_method = after_data.get("contactMethod", "")
+        if contact_method != "email":
+            print(f"Message {contact_id} n'est pas un email, pas d'envoi de réponse")
+            return
+        
+        # 2. answered == true dans le nouveau document
+        answered = after_data.get("answered", False)
+        if not answered:
+            print(f"Message {contact_id} n'est pas marqué comme répondu")
+            return
+        
+        # 3. answered == false dans l'ancien document (vient d'être répondu)
+        old_answered = before_data.get("answered", False)
+        if old_answered:
+            print(f"Message {contact_id} était déjà répondu, pas d'envoi de réponse")
+            return
+        
+        # 4. Le document a la clé "answer" et elle n'est pas vide
+        answer = after_data.get("answer", "")
+        if not answer or answer.strip() == "":
+            print(f"Message {contact_id} n'a pas de réponse valide")
+            return
+        
+        # Récupérer l'email du client
+        email = after_data.get("email", "")
+        if not email or email.strip() == "":
+            print(f"Message {contact_id} n'a pas d'email valide")
+            return
+        
+        # Vérifier que Resend API Key est configurée
+        api_key = get_resend_api_key()
+        if not api_key:
+            print(f"ERREUR: RESEND_API_KEY non configurée pour la réponse au message {contact_id}")
+            return
+        resend.api_key = api_key
+        
+        # Récupérer le nom du client pour personnaliser l'email
+        name = after_data.get("name", "Client")
+        
+        # Récupérer le message original
+        original_message = after_data.get("message", "")
+        
+        # Envoyer l'email au client avec la réponse
+        try:
+            # Créer le template HTML pour l'email de réponse
+            html_body = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }}
+                    .header {{
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 30px;
+                        text-align: center;
+                        border-radius: 10px 10px 0 0;
+                    }}
+                    .content {{
+                        background: #f9f9f9;
+                        padding: 30px;
+                        border-radius: 0 0 10px 10px;
+                    }}
+                    .message-box {{
+                        background: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                        border-left: 4px solid #667eea;
+                    }}
+                    .original-message-box {{
+                        background: #f0f0f0;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                        border-left: 4px solid #999;
+                    }}
+                    .footer {{
+                        text-align: center;
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 1px solid #ddd;
+                        color: #666;
+                        font-size: 12px;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Réponse à votre message</h1>
+                </div>
+                <div class="content">
+                    <p>Bonjour {name},</p>
+                    <p>Nous avons bien reçu votre message et nous vous répondons ci-dessous :</p>
+                    <div class="original-message-box">
+                        <p style="font-weight: bold; margin-top: 0; color: #666;">Votre message :</p>
+                        <p style="white-space: pre-wrap; margin: 0;">{original_message}</p>
+                    </div>
+                    <div class="message-box">
+                        <p style="font-weight: bold; margin-top: 0; color: #667eea;">Notre réponse :</p>
+                        <p style="white-space: pre-wrap; margin: 0;">{answer}</p>
+                    </div>
+                    <p>N'hésitez pas à nous contacter si vous avez d'autres questions.</p>
+                    <p>Cordialement,<br>L'équipe Harmonya</p>
+                    <p style="text-align: center; margin-top: 20px;">
+                        <a href="https://harmonyamassage.fr" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Visitez notre site web</a>
+                    </p>
+                </div>
+                <div class="footer">
+                    <p>Harmonya Massage & Bien-être</p>
+                    <p>1 A rue de la poste, 67400 ILLKIRCH GRAFFENSTADEN</p>
+                    <p>Téléphone: 06 26 14 25 89</p>
+                    <p><a href="https://harmonyamassage.fr" style="color: #667eea; text-decoration: none;">https://harmonyamassage.fr</a></p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            result = resend.Emails.send({
+                "from": FROM_EMAIL,
+                "to": email.strip(),
+                "subject": f"Réponse à votre message - Harmonya",
+                "html": html_body,
+            })
+            print(f"Email de réponse envoyé avec succès pour le message {contact_id} à {email}: {result}")
+        except Exception as e:
+            print(f"Erreur lors de l'envoi de l'email de réponse: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+    except Exception as e:
+        print(f"Erreur générale dans send_contact_answer_email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+def update_customer_service_names(
+    service_id: str,
+    new_name: str,
+    service_type_field: str,
+    service_names_field: str,
+    service_type_label: str
+) -> None:
+    """
+    Fonction générique pour mettre à jour les noms de service dans les documents clients
+    
+    Args:
+        service_id: L'ID du service (massage ou traitement)
+        new_name: Le nouveau nom du service
+        service_type_field: Le nom du champ contenant les IDs (ex: "massageTypes" ou "treatmentTypes")
+        service_names_field: Le nom du champ contenant les noms (ex: "massageTypesNames" ou "treatmentTypesNames")
+        service_type_label: Le label pour les logs (ex: "massage" ou "traitement")
+    """
+    try:
+        print(f"Le nom du {service_type_label} {service_id} a changé vers '{new_name}'")
+        
+        # Récupérer tous les clients qui ont ce service dans leur liste
+        db = firestore.client()
+        customers_ref = db.collection("customers")
+        
+        # Query pour trouver les clients avec ce service ID dans le tableau approprié
+        customers_query = customers_ref.where(service_type_field, "array_contains", service_id).stream()
+        
+        # Collecter toutes les mises à jour
+        updates = []
+        for customer_doc in customers_query:
+            try:
+                customer_data = customer_doc.to_dict()
+                service_types = customer_data.get(service_type_field, [])
+                service_types_names = customer_data.get(service_names_field, [])
+                
+                # Trouver l'index du service ID dans le tableau
+                if service_id in service_types:
+                    index = service_types.index(service_id)
+                    # Mettre à jour le nom correspondant
+                    if index < len(service_types_names):
+                        service_types_names[index] = new_name
+                    else:
+                        # Si le tableau des noms est plus court, l'étendre
+                        while len(service_types_names) < index:
+                            service_types_names.append("")
+                        service_types_names.append(new_name)
+                    
+                    # Ajouter à la liste des mises à jour
+                    updates.append((customer_doc.reference, service_types_names))
+            except Exception as e:
+                print(f"Erreur lors du traitement du client {customer_doc.id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        
+        # Effectuer les mises à jour par batch (max 500 par batch)
+        batch_size = 500
+        updated_count = 0
+        for i in range(0, len(updates), batch_size):
+            batch = db.batch()
+            batch_updates = updates[i:i + batch_size]
+            
+            for customer_ref, service_types_names in batch_updates:
+                batch.update(customer_ref, {
+                    service_names_field: service_types_names
+                })
+            
+            # Commiter le batch
+            batch.commit()
+            updated_count += len(batch_updates)
+            print(f"Batch {i // batch_size + 1}: Mis à jour {len(batch_updates)} client(s)")
+        
+        print(f"Mis à jour {updated_count} client(s) au total pour le {service_type_label} {service_id}")
+        
+    except Exception as e:
+        print(f"Erreur dans update_customer_service_names: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+@firestore_fn.on_document_updated(
+    document="massages/{massageId}",
     region="europe-west9"
 )
+def update_customer_massage_names(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """
+    Fonction déclenchée lorsqu'un massage est mis à jour
+    Met à jour les noms de massage dans les documents clients si le nom a changé
+    """
+    try:
+        before_snapshot = event.data.before
+        after_snapshot = event.data.after
+        
+        if not before_snapshot or not after_snapshot:
+            return
+        
+        before_data = before_snapshot.to_dict()
+        after_data = after_snapshot.to_dict()
+        massage_id = after_snapshot.id
+        
+        # Vérifier si le nom a changé
+        old_name = before_data.get("name", "")
+        new_name = after_data.get("name", "")
+        
+        if old_name == new_name or not new_name:
+            # Le nom n'a pas changé ou est vide, pas besoin de mettre à jour
+            return
+        
+        # Appeler la fonction générique
+        update_customer_service_names(
+            service_id=massage_id,
+            new_name=new_name,
+            service_type_field="massageTypes",
+            service_names_field="massageTypesNames",
+            service_type_label="massage"
+        )
+        
+    except Exception as e:
+        print(f"Erreur dans update_customer_massage_names: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+@firestore_fn.on_document_updated(
+    document="treatments/{treatmentId}",
+    region="europe-west9"
+)
+def update_customer_treatment_names(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """
+    Fonction déclenchée lorsqu'un traitement est mis à jour
+    Met à jour les noms de traitement dans les documents clients si le nom a changé
+    """
+    try:
+        before_snapshot = event.data.before
+        after_snapshot = event.data.after
+        
+        if not before_snapshot or not after_snapshot:
+            return
+        
+        before_data = before_snapshot.to_dict()
+        after_data = after_snapshot.to_dict()
+        treatment_id = after_snapshot.id
+        
+        # Vérifier si le nom a changé
+        old_name = before_data.get("name", "")
+        new_name = after_data.get("name", "")
+        
+        if old_name == new_name or not new_name:
+            # Le nom n'a pas changé ou est vide, pas besoin de mettre à jour
+            return
+        
+        # Appeler la fonction générique
+        update_customer_service_names(
+            service_id=treatment_id,
+            new_name=new_name,
+            service_type_field="treatmentTypes",
+            service_names_field="treatmentTypesNames",
+            service_type_label="traitement"
+        )
+        
+    except Exception as e:
+        print(f"Erreur dans update_customer_treatment_names: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+@https_fn.on_request(region="europe-west9")
 def paypal_webhook(req: https_fn.Request) -> https_fn.Response:
     """
     Handle PayPal webhook events
@@ -1267,13 +2019,30 @@ def paypal_webhook(req: https_fn.Request) -> https_fn.Response:
             
             if custom_id:
                 # Update voucher status in Firestore
-                voucher_ref = firestore.client().collection("gift_vouchers").document(custom_id)
-                voucher_ref.update({
-                    "status": "paid",
-                    "paidAt": firestore.SERVER_TIMESTAMP,
-                    "paypalOrderId": order_id,
-                })
-                print(f"Updated voucher {custom_id} to paid status")
+                collection_name = "giftVouchers"  # Explicitly set collection name
+                print(f"DEBUG: Attempting to update voucher {custom_id} in collection '{collection_name}'")
+                voucher_ref = firestore.client().collection(collection_name).document(custom_id)
+                
+                # Check if document exists first
+                doc = voucher_ref.get()
+                if not doc.exists:
+                    print(f"ERROR: Voucher document {custom_id} does not exist in collection '{collection_name}'")
+                    return https_fn.Response(
+                        json.dumps({"error": f"Voucher {custom_id} not found in collection '{collection_name}'"}),
+                        status=404,
+                        mimetype="application/json"
+                    )
+                
+                try:
+                    voucher_ref.update({
+                        "status": "paid",
+                        "paidAt": firestore.SERVER_TIMESTAMP,
+                        "paypalOrderId": order_id,
+                    })
+                    print(f"Updated voucher {custom_id} to paid status in collection '{collection_name}'")
+                except Exception as update_error:
+                    print(f"ERROR updating voucher {custom_id}: {str(update_error)}")
+                    raise update_error
             else:
                 print(f"Warning: No custom_id found in webhook for order {order_id}")
             
@@ -1319,11 +2088,28 @@ def paypal_webhook(req: https_fn.Request) -> https_fn.Response:
             
             if custom_id:
                 # Update voucher status
-                voucher_ref = firestore.client().collection("gift_vouchers").document(custom_id)
-                voucher_ref.update({
-                    "status": "refunded",
-                })
-                print(f"Updated voucher {custom_id} to refunded status")
+                collection_name = "giftVouchers"  # Explicitly set collection name
+                print(f"DEBUG: Attempting to update voucher {custom_id} in collection '{collection_name}'")
+                voucher_ref = firestore.client().collection(collection_name).document(custom_id)
+                
+                # Check if document exists first
+                doc = voucher_ref.get()
+                if not doc.exists:
+                    print(f"ERROR: Voucher document {custom_id} does not exist in collection '{collection_name}'")
+                    return https_fn.Response(
+                        json.dumps({"error": f"Voucher {custom_id} not found in collection '{collection_name}'"}),
+                        status=404,
+                        mimetype="application/json"
+                    )
+                
+                try:
+                    voucher_ref.update({
+                        "status": "refunded",
+                    })
+                    print(f"Updated voucher {custom_id} to refunded status in collection '{collection_name}'")
+                except Exception as update_error:
+                    print(f"ERROR updating voucher {custom_id}: {str(update_error)}")
+                    raise update_error
             
             return https_fn.Response(
                 json.dumps({"status": "success"}),
